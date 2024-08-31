@@ -43,6 +43,12 @@ class AuthPreferences(bpy.types.AddonPreferences):
         subtype='PASSWORD',
         update=lambda self, context: self.update_auth_status(context)
     )
+    assets_location: bpy.props.StringProperty(
+        name="Assets Location",
+        description="Directory to store assets",
+        default="",
+        subtype='DIR_PATH'
+    )
     auth_success: bpy.props.BoolProperty(
         name="Authentication Success",
         description="Indicates if the authentication was successful",
@@ -57,6 +63,7 @@ class AuthPreferences(bpy.types.AddonPreferences):
         layout.label(text="Enter your iMeshh Online credentials")
         layout.prop(self, "username")
         layout.prop(self, "password")
+        layout.prop(self, "assets_location")
         layout.operator("imeshh_online.save_credentials", text="Save Credentials").enabled = not self.auth_success
 
 class IMESHH_OT_Authenticate(bpy.types.Operator):
