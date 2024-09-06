@@ -1,7 +1,7 @@
 bl_info = {
     "name": "iMeshh Online",
     "author": "iMeshh Ltd",
-    "version": (0, 2, 3),
+    "version": (0, 2, 4),
     "blender": (3, 6, 0),
     "category": "Asset Manager",
     "location": "View3D > Tools > iMeshh Online",
@@ -16,32 +16,90 @@ print("| Thank you for using our software   |")
 print("|____________________________________|")
 print("\n")
 
+import subprocess
+import sys
+
+def ensure_flask_installed():
+    try:
+        import flask
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "flask"])
+
+ensure_flask_installed()
+
 import bpy
 import requests
-from requests.auth import HTTPBasicAuth
-import asyncio
-import concurrent.futures
 import os
+from threading import Thread
+from flask import Flask, request
+from requests_oauthlib import OAuth2Session
 from bpy.app.handlers import persistent
+import time
 
 wp_site_url = "https://shopimeshhcom.bigscoots-staging.com"
 auth_endpoint = wp_site_url + "/wp-json/wp/v2/users/me"
 product_categories_endpoint = wp_site_url + "/wp-json/wc/v3/products/categories"
 products_endpoint = wp_site_url + "/wp-json/wc/v3/products"
 
-def authenticated(username, password):
-    response = requests.get(auth_endpoint, auth=HTTPBasicAuth(username, password))
-    print (response)
-    return response.status_code == 200
+client_id = "your-client-id"
+client_secret = "your-client-secret"
+redirect_uri = "http://localhost:5000/callback"
+token_url = wp_site_url + '/oauth/token'
+
+app = Flask(__name__)
+oauth_callback_received = False
+oauth_token = None
+token_expiration = None
+
+def run_flask():
+    app.run(port=5000)
+
+@app.route("/callback")
+
+def oauth_callback():
+    global oauth_callback_received, oauth_token, token_expiration
+    oauth = OAuth2Session(client_id, redirect_uri=redirect_uri)
+    oauth_token = oauth.fetch_token(
+        token_url,
+        authorization_response=request.url,
+        client_secret=client_secret
+    )
+    oauth_callback_received = True
+    token_expiration = time.time() + oauth_token.get('expires_in', 3600)
+    return "OAuth login successful. You may close this window."
+
+def refresh_access_token(prefs):
+    global oauth_token, token_expiration
+    if time.time() > token_expiration:
+        oauth = OAuth2Session(client_id, token=oauth_token)
+        extra = {
+            'client_id': client_id,
+            'client_secret': client_secret,
+        }
+        new_token = oauth.refresh_token(token_url, refresh_token=prefs.refresh_token, **extra)
+        oauth_token = new_token
+        prefs.access_token = new_token['access_token']
+        prefs.refresh_token = new_token['refresh_token']
+        token_expiration = time.time() + new_token.get('expires_in', 3600)
 
 def fetch_product_categories():
-    response = requests.get(product_categories_endpoint)
+    prefs = bpy.context.preferences.addons[__name__].preferences
+    refresh_access_token(prefs)
+    headers = {
+        "Authorization": f"Bearer {prefs.access_token}"
+    }
+    response = requests.get(product_categories_endpoint, headers=headers)
     if response.status_code == 200:
         return response.json()
     return []
 
 def fetch_products_in_category(category_id):
-    response = requests.get(f"{products_endpoint}?category={category_id}")
+    prefs = bpy.context.preferences.addons[__name__].preferences
+    refresh_access_token(prefs)
+    headers = {
+        "Authorization": f"Bearer {prefs.access_token}"
+    }
+    response = requests.get(f"{products_endpoint}?category={category_id}", headers=headers)
     if response.status_code == 200:
         return response.json()
     return []
@@ -74,62 +132,45 @@ def fetch_and_organize_assets():
                 subcategory = product.get('categories', [{'name': 'default'}])[0]['name']
                 save_thumbnail_to_cache(thumbnail_url, category['name'], subcategory, product['name'], image_data)
 
-class AuthPreferences(bpy.types.AddonPreferences):
-    bl_idname = __name__
+def fetch_thumbnails():
+    bpy.context.scene.thumbnails_loaded = False
+    bpy.context.scene.loaded_thumbnails.clear()
+    fetch_and_organize_assets()
+    bpy.app.timers.register(load_thumbnails)
 
-    username: bpy.props.StringProperty(
-        name="Username",
-        description="Username",
-        default="",
-        update=lambda self, context: self.update_auth_status(context)
-    )
-    password: bpy.props.StringProperty(
-        name="Password",
-        description="Password",
-        default="",
-        subtype='PASSWORD',
-        update=lambda self, context: self.update_auth_status(context)
-    )
-    assets_location: bpy.props.StringProperty(
-        name="Assets Location",
-        description="Directory to store assets",
-        default="",
-        subtype='DIR_PATH'
-    )
-    auth_success: bpy.props.BoolProperty(
-        name="Authentication Success",
-        description="Indicates if the authentication was successful",
-        default=False
-    )
+def load_thumbnails():
+    context = bpy.context
+    base_dir = context.preferences.addons[__name__].preferences.assets_location
+    if not os.path.exists(base_dir):
+        print(f"Assets location not found: {base_dir}")
+        return
 
-    def update_auth_status(self, context):
-        self.auth_success = False
+    context.scene.loaded_thumbnails.clear()
+    print(f"Loading thumbnails from {base_dir}")
 
-    def draw(self, context):
-        layout = self.layout
-        layout.label(text="Enter your iMeshh Online credentials")
-        layout.prop(self, "username")
-        layout.prop(self, "password")
-        layout.prop(self, "assets_location")
+    for root, _, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith('.png'):
+                thumbnail_path = os.path.join(root, file)
+                try:
+                    image = bpy.data.images.load(thumbnail_path)
+                    thumbnail_item = context.scene.loaded_thumbnails.add()
+                    thumbnail_item.preview_icon_id = image.preview.icon_id
+                    print(f"Loaded thumbnail {thumbnail_path}")
+                except Exception as e:
+                    print(f"Failed to load image {thumbnail_path}: {e}")
 
-        if self.auth_success:
-            layout.label(text="Authentication successful", icon='CHECKMARK')
-        else:
-            layout.operator("imeshh_online.save_credentials", text="Save Credentials")
+    context.scene.thumbnails_loaded = True
+    return None
 
-class IMESHH_OT_Authenticate(bpy.types.Operator):
-    bl_idname = "imeshh_online.save_credentials"
-    bl_label = "Save Credentials"
 
-    def execute(self, context):
-        prefs = context.preferences.addons[__name__].preferences
-        if authenticated(prefs.username, prefs.password):
-            prefs.auth_success = True
-            self.report({'INFO'}, "Authentication successful")
-        else:
-            prefs.auth_success = False
-            self.report({'ERROR'}, "Authentication failed")
-        return {'FINISHED'}
+@persistent
+def on_load(dummy):
+    prefs = bpy.context.preferences.addons[__name__].preferences
+    if prefs.auth_success:
+        bpy.context.scene.thumbnails_loaded = False
+        bpy.context.scene.loaded_thumbnails.clear()
+        bpy.app.timers.register(fetch_thumbnails)
 
 class IMESHH_PT_AssetLibraryPanel(bpy.types.Panel):
     bl_label = "iMeshh Online Library"
@@ -155,41 +196,32 @@ class IMESHH_PT_AssetLibraryPanel(bpy.types.Panel):
                     row = layout.row()
                 row.operator("imeshh_online.load_asset", text="", icon_value=thumbnail.preview_icon_id)
 
-class ThumbnailItem(bpy.types.PropertyGroup):
-    preview_icon_id: bpy.props.IntProperty()
+class AuthPreferences(bpy.types.AddonPreferences):
+    bl_idname = __name__
 
-async def fetch_thumbnails_async(context):
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(pool, fetch_and_organize_assets)
-        thumbnails = []
-        base_dir = context.preferences.addons[__name__].preferences.assets_location
-        for root, _, files in os.walk(base_dir):
-            for file in files:
-                if file.endswith('.png'):
-                    thumbnail_path = os.path.join(root, file)
-                    image = bpy.data.images.load(thumbnail_path)
-                    thumbnail_item = context.scene.loaded_thumbnails.add()
-                    thumbnail_item.preview_icon_id = image.preview.icon_id
+    access_token: bpy.props.StringProperty(name="Access Token", default="")
+    refresh_token: bpy.props.StringProperty(name="Refresh Token", default="")
+    auth_success: bpy.props.BoolProperty(name="Authentication Success", default=False)
+    assets_location: bpy.props.StringProperty(
+        name="Assets Location",
+        description="Directory to store assets",
+        default="",
+        subtype='DIR_PATH'
+    )
 
-        context.scene.thumbnails_loaded = True
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="OAuth Login for iMeshh Online")
+        layout.prop(self, "assets_location")
 
-def load_thumbnails():
-    context = bpy.context
-    asyncio.run(fetch_thumbnails_async(context))
-    return 1.0
-
-@persistent
-def on_load(dummy):
-    prefs = bpy.context.preferences.addons[__name__].preferences
-    if prefs.auth_success:
-        bpy.context.scene.thumbnails_loaded = False
-        bpy.context.scene.loaded_thumbnails.clear()
-        bpy.app.timers.register(load_thumbnails)
+        if self.auth_success:
+            layout.label(text="Authentication successful", icon='CHECKMARK')
+        else:
+            layout.operator("imeshh_online.oauth_login", text="Log in")
 
 def register():
     bpy.utils.register_class(AuthPreferences)
-    bpy.utils.register_class(IMESHH_OT_Authenticate)
+    bpy.utils.register_class(IMESHH_OT_OAuthLogin)
     bpy.utils.register_class(IMESHH_PT_AssetLibraryPanel)
     bpy.utils.register_class(ThumbnailItem)
     bpy.types.Scene.thumbnails_loaded = bpy.props.BoolProperty(default=False)
@@ -198,7 +230,7 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(AuthPreferences)
-    bpy.utils.unregister_class(IMESHH_OT_Authenticate)
+    bpy.utils.unregister_class(IMESHH_OT_OAuthLogin)
     bpy.utils.unregister_class(IMESHH_PT_AssetLibraryPanel)
     bpy.utils.unregister_class(ThumbnailItem)
     del bpy.types.Scene.thumbnails_loaded
