@@ -1,7 +1,7 @@
 bl_info = {
     "name": "iMeshh Online",
     "author": "iMeshh Ltd",
-    "version": (0, 2, 4),
+    "version": (0, 2, 5),
     "blender": (3, 6, 0),
     "category": "Asset Manager",
     "location": "View3D > Tools > iMeshh Online",
@@ -22,8 +22,10 @@ import sys
 def ensure_flask_installed():
     try:
         import flask
+        from requests_oauthlib import OAuth2Session
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "flask"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "requests_oauthlib"])
 
 ensure_flask_installed()
 
@@ -55,7 +57,6 @@ def run_flask():
     app.run(port=5000)
 
 @app.route("/callback")
-
 def oauth_callback():
     global oauth_callback_received, oauth_token, token_expiration
     oauth = OAuth2Session(client_id, redirect_uri=redirect_uri)
@@ -67,6 +68,50 @@ def oauth_callback():
     oauth_callback_received = True
     token_expiration = time.time() + oauth_token.get('expires_in', 3600)
     return "OAuth login successful. You may close this window."
+
+import webbrowser
+
+class IMESHH_OT_OAuthLogin(bpy.types.Operator):
+    bl_idname = "imeshh.oauth_login"
+    bl_label = "Login to iMeshh"
+    
+    _timer = None
+    _flask_thread = None
+
+    def modal(self, context, event):
+        global oauth_callback_received
+
+        if event.type == 'TIMER':
+            if oauth_callback_received:
+                context.preferences.addons[__name__].preferences.auth_success = True
+                bpy.context.window_manager.event_timer_remove(self._timer)
+                self._flask_thread.join()
+                self.report({'INFO'}, "Authentication successful!")
+                return {'FINISHED'}
+
+        return {'PASS_THROUGH'}
+
+    def execute(self, context):
+        global oauth_callback_received
+        oauth_callback_received = False
+        self._flask_thread = Thread(target=run_flask)
+        self._flask_thread.start()
+        
+        oauth = OAuth2Session(client_id, redirect_uri=redirect_uri)
+        authorization_url, _ = oauth.authorization_url(wp_site_url + '/oauth/authorize')
+        webbrowser.open(authorization_url)
+
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(1.0, window=context.window)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    def cancel(self, context):
+        bpy.context.window_manager.event_timer_remove(self._timer)
+        self._flask_thread.join()
+
+        return {'CANCELLED'}
+
 
 def refresh_access_token(prefs):
     global oauth_token, token_expiration
@@ -204,20 +249,22 @@ class AuthPreferences(bpy.types.AddonPreferences):
     auth_success: bpy.props.BoolProperty(name="Authentication Success", default=False)
     assets_location: bpy.props.StringProperty(
         name="Assets Location",
-        description="Directory to store assets",
+        description="Directory to save and load asset thumbnails",
+        subtype='DIR_PATH',
         default="",
-        subtype='DIR_PATH'
     )
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="OAuth Login for iMeshh Online")
         layout.prop(self, "assets_location")
 
         if self.auth_success:
-            layout.label(text="Authentication successful", icon='CHECKMARK')
+            layout.label(text="Authenticated successfully", icon='CHECKMARK')
         else:
-            layout.operator("imeshh_online.oauth_login", text="Log in")
+            layout.operator("imeshh.oauth_login", text="Authenticate with OAuth")
+
+class ThumbnailItem(bpy.types.PropertyGroup):
+    preview_icon_id: bpy.props.IntProperty()
 
 def register():
     bpy.utils.register_class(AuthPreferences)
