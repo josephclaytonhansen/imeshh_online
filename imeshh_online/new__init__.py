@@ -23,9 +23,11 @@ def ensure_flask_installed():
     try:
         import flask
         from requests_oauthlib import OAuth2Session
+        from dotenv import load_dotenv
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "flask"])
         subprocess.check_call([sys.executable, "-m", "pip", "install", "requests_oauthlib"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "python-dotenv"])
 
 ensure_flask_installed()
 
@@ -38,14 +40,16 @@ from requests_oauthlib import OAuth2Session
 from bpy.app.handlers import persistent
 import time
 
-wp_site_url = "https://shopimeshhcom.bigscoots-staging.com"
+load_dotenv()
+
+wp_site_url = os.getenv("WP_SITE_URL")
+redirect_uri = os.getenv("REDIRECT_URI")
+client_id = os.getenv("CLIENT_ID")
+client_secret = os.getenv("CLIENT_SECRET")
+
 auth_endpoint = wp_site_url + "/wp-json/wp/v2/users/me"
 product_categories_endpoint = wp_site_url + "/wp-json/wc/v3/products/categories"
 products_endpoint = wp_site_url + "/wp-json/wc/v3/products"
-
-client_id = "your-client-id"
-client_secret = "your-client-secret"
-redirect_uri = "http://localhost:5000/callback"
 token_url = wp_site_url + '/oauth/token'
 
 app = Flask(__name__)
