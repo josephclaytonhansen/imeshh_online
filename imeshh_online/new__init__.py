@@ -1,7 +1,7 @@
 bl_info = {
     "name": "iMeshh Online",
     "author": "iMeshh Ltd",
-    "version": (0, 2, 5),
+    "version": (0, 2, 7),
     "blender": (3, 6, 0),
     "category": "Asset Manager",
     "location": "View3D > Tools > iMeshh Online",
@@ -23,11 +23,9 @@ def ensure_flask_installed():
     try:
         import flask
         from requests_oauthlib import OAuth2Session
-        from dotenv import load_dotenv
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "flask"])
         subprocess.check_call([sys.executable, "-m", "pip", "install", "requests_oauthlib"])
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "python-dotenv"])
 
 ensure_flask_installed()
 
@@ -40,38 +38,79 @@ from requests_oauthlib import OAuth2Session
 from bpy.app.handlers import persistent
 import time
 
-load_dotenv()
+client_id="SXlinucUaJZhHvDFaTwnFKXxiLfxuvnm"
+client_secret="VMxNHMTKBHdwpPBurZxQKfgubYzXLeKL"
+wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
+redirect_uri = 'http://localhost:5000/callback'
 
-wp_site_url = os.getenv("WP_SITE_URL")
-redirect_uri = os.getenv("REDIRECT_URI")
-client_id = os.getenv("CLIENT_ID")
-client_secret = os.getenv("CLIENT_SECRET")
+
 
 auth_endpoint = wp_site_url + "/wp-json/wp/v2/users/me"
 product_categories_endpoint = wp_site_url + "/wp-json/wc/v3/products/categories"
 products_endpoint = wp_site_url + "/wp-json/wc/v3/products"
-token_url = wp_site_url + '/oauth/token'
+token_url = wp_site_url + '/wp-json/moserver/token'
 
 app = Flask(__name__)
 oauth_callback_received = False
 oauth_token = None
 token_expiration = None
 
+import logging
+from logging.handlers import RotatingFileHandler
+
+log_file = "flask.log"
+
+def setup_logging(log_file):
+    handler = RotatingFileHandler(log_file, maxBytes=10000, backupCount=1)
+    
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+    handler.setFormatter(formatter)
+    
+    app.logger.addHandler(handler)
+    app.logger.setLevel(logging.DEBUG)
+
+    logging.getLogger().addHandler(handler)
+    logging.getLogger().setLevel(logging.DEBUG)
+
+setup_logging(log_file)
+
+@app.before_request
+def log_request():
+    app.logger.debug(f"Received request: {request.method} {request.url}")
+
+@app.route("/")
+def index():
+    app.logger.debug("Accessed index route")
+    return "Flask server running"
+
 def run_flask():
-    app.run(port=5000)
+    log_file = os.path.join(bpy.context.preferences.addons[__name__].preferences.assets_location, "flask.log")
+    with open(log_file, 'a') as f:
+        f.write("Flask server started\n")
+    app.run(port=5000, debug=True, use_reloader=False)
+    with open(log_file, 'a') as f:
+        f.write("Flask server stopped\n")
 
 @app.route("/callback")
 def oauth_callback():
     global oauth_callback_received, oauth_token, token_expiration
-    oauth = OAuth2Session(client_id, redirect_uri=redirect_uri)
-    oauth_token = oauth.fetch_token(
-        token_url,
-        authorization_response=request.url,
-        client_secret=client_secret
-    )
-    oauth_callback_received = True
-    token_expiration = time.time() + oauth_token.get('expires_in', 3600)
-    return "OAuth login successful. You may close this window."
+    try:
+        oauth = OAuth2Session(client_id, redirect_uri=redirect_uri)
+        oauth_token = oauth.fetch_token(
+            token_url,
+            authorization_response=request.url,
+            client_secret=client_secret
+        )
+        oauth_callback_received = True
+        token_expiration = time.time() + oauth_token.get('expires_in', 3600)
+        app.logger.info("OAuth login successful")
+        return "OAuth login successful. You may close this window."
+    except Exception as e:
+        error_message = str(e)
+        print(f"Error during OAuth callback: {error_message}")
+        app.logger.error(f"Error during OAuth callback: {error_message}")
+        raise Exception(f"Error during OAuth callback: {error_message}")
 
 import webbrowser
 
@@ -102,7 +141,7 @@ class IMESHH_OT_OAuthLogin(bpy.types.Operator):
         self._flask_thread.start()
         
         oauth = OAuth2Session(client_id, redirect_uri=redirect_uri)
-        authorization_url, _ = oauth.authorization_url(wp_site_url + '/oauth/authorize')
+        authorization_url, _ = oauth.authorization_url(wp_site_url + '/wp-json/moserver/authorize')
         webbrowser.open(authorization_url)
 
         wm = context.window_manager
