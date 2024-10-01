@@ -32,6 +32,7 @@ def authenticate(prefs):
             data = response.json()
             prefs.access_token = data['token']
             print("Authentication successful! Token saved.")
+            fetch_thumbnails()
         else:
             print(f"Failed to authenticate. Status Code: {response.status_code}")
             print(f"Response: {response.text}")
