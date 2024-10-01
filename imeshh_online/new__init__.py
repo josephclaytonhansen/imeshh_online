@@ -1,7 +1,7 @@
 bl_info = {
     "name": "iMeshh Online",
     "author": "iMeshh Ltd",
-    "version": (0, 2, 13),
+    "version": (0, 2, 14),
     "blender": (3, 6, 0),
     "category": "Asset Manager",
     "location": "View3D > Tools > iMeshh Online",
@@ -53,6 +53,9 @@ def fetch_product_categories():
     response = requests.get(product_categories_endpoint, headers=headers)
     if response.status_code == 200:
         return response.json()
+    else:
+        print(f"Failed to fetch product categories. Status Code: {response.status_code}")
+        print(f"Response: {response.text}")
     return []
 
 def fetch_products_in_category(category_id):
@@ -64,12 +67,16 @@ def fetch_products_in_category(category_id):
     response = requests.get(f"{products_endpoint}?category={category_id}", headers=headers)
     if response.status_code == 200:
         return response.json()
+    else:
+        print(f"Failed to fetch products in category {category_id}. Status Code: {response.status_code}")
+        print(f"Response: {response.text}")
     return []
 
 def fetch_thumbnail(url):
     response = requests.get(url)
     if response.status_code == 200:
         return response.content
+    print(f"Failed to fetch thumbnail from {url}. Status Code: {response.status_code}")
     return None
 
 def save_thumbnail_to_cache(thumbnail_url, category, subcategory, product_name, image_data):
@@ -85,18 +92,28 @@ def save_thumbnail_to_cache(thumbnail_url, category, subcategory, product_name, 
 
 def fetch_and_organize_assets():
     categories = fetch_product_categories()
+    if not categories:
+        print("No categories found.")
+        return
     for category in categories:
         products = fetch_products_in_category(category['id'])
+        if not products:
+            print(f"No products found in category {category['name']}")
+            continue
         for product in products:
             if 'images' in product and product['images']:
                 thumbnail_url = product['images'][0]['src']
                 image_data = fetch_thumbnail(thumbnail_url)
-                subcategory = product.get('categories', [{'name': 'default'}])[0]['name']
-                save_thumbnail_to_cache(thumbnail_url, category['name'], subcategory, product['name'], image_data)
+                if image_data:
+                    subcategory = product.get('categories', [{'name': 'default'}])[0]['name']
+                    save_thumbnail_to_cache(thumbnail_url, category['name'], subcategory, product['name'], image_data)
+                else:
+                    print(f"Failed to download thumbnail for product {product['name']}")
 
 def fetch_thumbnails():
     bpy.context.scene.thumbnails_loaded = False
     bpy.context.scene.loaded_thumbnails.clear()
+    print("Fetching and organizing assets...")
     fetch_and_organize_assets()
     bpy.app.timers.register(load_thumbnails)
 
@@ -215,6 +232,7 @@ def unregister():
     bpy.utils.unregister_class(ThumbnailItem)
     del bpy.types.Scene.thumbnails_loaded
     del bpy.types.Scene.loaded_thumbnails
+    bpy.app.handlers.load_post.remove(on_load)
 
 if __name__ == "__main__":
     register()
