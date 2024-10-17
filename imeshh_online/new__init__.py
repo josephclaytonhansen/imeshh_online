@@ -1,7 +1,7 @@
 bl_info = {
     "name": "iMeshh Online",
     "author": "iMeshh Ltd",
-    "version": (0, 2, 23),
+    "version": (0, 2, 63),
     "blender": (3, 6, 0),
     "category": "Asset Manager",
     "location": "View3D > Tools > iMeshh Online",
@@ -10,81 +10,67 @@ bl_info = {
 import bpy
 import requests
 import os
-from bpy.app.handlers import persistent
-import time
-import urllib.parse
 import threading
+import urllib.parse
+from bpy.utils import previews
+from bpy.props import (
+    CollectionProperty,
+    EnumProperty,
+    StringProperty,
+    IntProperty,
+    BoolProperty,
+)
+from bpy.types import Panel
 
+
+# Configuration
 wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
 token_endpoint = wp_site_url + "/wp-json/jwt-auth/v1/token"
-product_categories_endpoint = wp_site_url + "/wp-json/wc/v3/products/categories"
 products_endpoint = wp_site_url + "/wp-json/wc/v3/products"
-
-desired_categories = {
-    "architectural", "bathroom", "bedroom", "clothing", "decorations", 
-    "dining", "electronics", "food & drink", "furniture details", "kitchen", 
-    "lighting", "office", "outdoor", "plants", "seating", "sport", "storage", "tables"
-}
-
-oauth_token = None
 thumbnails_per_page = 12
-download_queue = []
 
-def authenticate(prefs):
-    payload = {
-        'username': prefs.username,
-        'password': prefs.password
-    }
-    
+# Preview collections
+preview_collections = {}
+
+def register_window_manager_properties():
+    if not hasattr(bpy.types.WindowManager, "web_asset_manager_previews"):
+        bpy.types.WindowManager.web_asset_manager_previews = EnumProperty(items=lambda self, context: update_web_previews(self, context))
+
+def unregister_window_manager_properties():
+    if hasattr(bpy.types.WindowManager, "web_asset_manager_previews"):
+        del bpy.types.WindowManager.web_asset_manager_previews
+
+def init_previews():
+    """Initialize the preview collections."""
+    pcoll = previews.new()
+    pcoll.my_previews = []
+    pcoll.my_previews_data = {}
+    bpy.context.window_manager.web_asset_manager_previews = pcoll  # Store as EnumProperty
+
+def update_web_previews(self, context):
+    """Update the previews list value."""
+    global preview_collections
+    pcoll = bpy.context.window_manager.web_asset_manager_previews
+    items = []
+
+    for asset in pcoll.my_previews_data.values():
+        items.append((asset['name'], asset['name'], "", asset['icon_id'], len(items)))
+
+    return items
+
+def fetch_assets(page=0):
+    prefs = bpy.context.preferences.addons[__name__].preferences
+    headers = {"Authorization": f"Bearer {prefs.access_token}"}
+    params = {"per_page": thumbnails_per_page, "page": page + 1}
+
     try:
-        response = requests.post(token_endpoint, data=payload)
+        response = requests.get(products_endpoint, headers=headers, params=params)
         if response.status_code == 200:
-            data = response.json()
-            prefs.access_token = data['token']
-            print("Authentication successful! Token saved.")
-            fetch_thumbnails(0)
+            return response.json()
         else:
-            print(f"Failed to authenticate. Status Code: {response.status_code}")
-            print(f"Response: {response.text}")
+            print("Failed to fetch assets:", response.text)
     except Exception as e:
-        print(f"Error during authentication: {e}")
-
-def refresh_access_token(prefs):
-    global oauth_token
-    oauth_token = {
-        'access_token': prefs.access_token
-    }
-
-def fetch_product_categories():
-    prefs = bpy.context.preferences.addons[__name__].preferences
-    refresh_access_token(prefs)
-    headers = {
-        "Authorization": f"Bearer {prefs.access_token}"
-    }
-    response = requests.get(product_categories_endpoint, headers=headers)
-    
-    if response.status_code == 200:
-        all_categories = response.json()
-        filtered_categories = [cat for cat in all_categories if cat['name'].lower() in desired_categories]
-        return filtered_categories
-    else:
-        print(f"Failed to fetch product categories. Status Code: {response.status_code}")
-        print(f"Response: {response.text}")
-    return []
-
-
-def fetch_products_in_category(category_id):
-    prefs = bpy.context.preferences.addons[__name__].preferences
-    refresh_access_token(prefs)
-    headers = {
-        "Authorization": f"Bearer {prefs.access_token}"
-    }
-    response = requests.get(f"{products_endpoint}?category={category_id}", headers=headers)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"Failed to fetch products in category {category_id}. Status Code: {response.status_code}")
-        print(f"Response: {response.text}")
+        print(f"Error fetching assets: {e}")
     return []
 
 def fetch_thumbnail(url):
@@ -94,94 +80,64 @@ def fetch_thumbnail(url):
     print(f"Failed to fetch thumbnail from {url}. Status Code: {response.status_code}")
     return None
 
-def save_thumbnail_to_cache(thumbnail_url, category, subcategory):
-    base_dir = bpy.context.preferences.addons[__name__].preferences.assets_location
-    category_path = os.path.join(base_dir, category, subcategory)
-    os.makedirs(category_path, exist_ok=True)
-    
+def save_thumbnail_to_cache(thumbnail_url, save_dir):
     thumbnail_filename = os.path.basename(urllib.parse.urlparse(thumbnail_url).path)
-    thumbnail_path = os.path.join(category_path, thumbnail_filename)
-    
-    if os.path.exists(thumbnail_path):
-        print(f"Thumbnail already exists at {thumbnail_path}, skipping download.")
-        return thumbnail_path
-    
-    image_data = fetch_thumbnail(thumbnail_url)
-    if image_data:
-        with open(thumbnail_path, 'wb') as f:
-            f.write(image_data)
-    
+    thumbnail_path = os.path.join(save_dir, thumbnail_filename)
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    if not os.path.exists(thumbnail_path):
+        image_data = fetch_thumbnail(thumbnail_url)
+        if image_data:
+            with open(thumbnail_path, 'wb') as f:
+                f.write(image_data)
+            print(f"Thumbnail saved: {thumbnail_path}")
     return thumbnail_path
 
-def fetch_and_organize_assets():
-    categories = fetch_product_categories()
-    if not categories:
-        print("No categories found.")
-        return
-    for category in categories:
-        products = fetch_products_in_category(category['id'])
+def load_thumbnail_image(thumbnail_path):
+    try:
+        if os.path.exists(thumbnail_path):
+            image = bpy.data.images.load(thumbnail_path)
+            image.name = os.path.basename(thumbnail_path)
+            return image
+    except Exception as e:
+        print(f"Failed to load thumbnail image from {thumbnail_path}: {e}")
+    return None
+
+def load_thumbnails(page=0):
+    bpy.context.scene.thumbnails_loaded = False
+    prefs = bpy.context.preferences.addons[__name__].preferences
+    save_dir = prefs.assets_location
+    bpy.context.scene.loaded_thumbnails.clear()
+
+    def load_images():
+        products = fetch_assets(page)
         if not products:
-            print(f"No products found in category {category['name']}")
-            continue
+            return
+
         for product in products:
             if 'images' in product and product['images']:
                 thumbnail_url = product['images'][0]['src']
-                subcategory = product.get('categories', [{'name': 'default'}])[0]['name']
-                thumbnail_path = save_thumbnail_to_cache(thumbnail_url, category['name'], subcategory)
+                thumbnail_path = save_thumbnail_to_cache(thumbnail_url, save_dir)
+                image = load_thumbnail_image(thumbnail_path)
                 
-                if os.path.exists(thumbnail_path):
-                    print(f"Thumbnail saved at {thumbnail_path}")
-                else:
-                    print(f"Failed to save thumbnail for {product['name']}")
-            else:
-                print(f"Failed to download thumbnail for product {product['name']}")
-
-
-def fetch_thumbnails(page):
-    bpy.context.scene.thumbnails_loaded = False
-    thumbnails_per_page = bpy.context.scene.thumbnails_per_page
-    bpy.context.scene.loaded_thumbnails.clear()
-
-    print(f"Fetching and organizing assets for page {page}...")
-    threading.Thread(target=fetch_and_organize_assets).start()
-
-    base_dir = bpy.context.preferences.addons[__name__].preferences.assets_location
-    if not os.path.exists(base_dir):
-        print(f"Assets location not found: {base_dir}")
-        return
-
-    print(f"Loading thumbnails from {base_dir}")
-    loaded_images = 0
-
-    for root, _, files in os.walk(base_dir):
-        if loaded_images >= thumbnails_per_page * (page + 1):
-            break
-        for file in sorted(files):
-            if file.endswith('.png'):
-                if thumbnails_per_page * page <= loaded_images < thumbnails_per_page * (page + 1):
-                    thumbnail_path = os.path.join(root, file)
-                    try:
-                        image = bpy.data.images.load(thumbnail_path)
+                if image:
+                    # Use the previews collection
+                    preview = bpy.context.window_manager.web_asset_manager_previews.load(image.name, thumbnail_path, 'IMAGE')
+                    if preview:
                         thumbnail_item = bpy.context.scene.loaded_thumbnails.add()
-                        thumbnail_item.preview_icon_id = image.preview.icon_id
-                        print(f"Loaded thumbnail {thumbnail_path}")
-                    except Exception as e:
-                        print(f"Failed to load image {thumbnail_path}: {e}")
-                loaded_images += 1
+                        thumbnail_item.preview_icon_id = preview.icon_id
+                    else:
+                        print(f"Image loaded but has no preview: {thumbnail_path}")
+                else:
+                    print(f"Could not load thumbnail: {thumbnail_path}")
 
-    bpy.context.scene.thumbnails_loaded = True
+        bpy.context.scene.thumbnails_loaded = True
 
+    threading.Thread(target=load_images).start()
 
-@persistent
-def on_load(dummy):
-    prefs = bpy.context.preferences.addons[__name__].preferences
-    if prefs.access_token:
-        bpy.context.scene.thumbnails_loaded = False
-        bpy.context.scene.loaded_thumbnails.clear()
-        bpy.app.timers.register(fetch_thumbnails)
-
-
-class IMESHH_PT_AssetLibraryPanel(bpy.types.Panel):
+class IMESHH_PT_AssetLibraryPanel(Panel):
     bl_label = "iMeshh Online Library"
     bl_idname = "IMESHH_PT_asset_library_panel"
     bl_space_type = 'VIEW_3D'
@@ -191,11 +147,8 @@ class IMESHH_PT_AssetLibraryPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        prefs = context.preferences.addons[__name__].preferences
 
         if not scene.thumbnails_loaded:
-            if not prefs.access_token:
-                layout.label(text="Please authenticate to access the library")
             layout.label(text="Loading assets...", icon='TIME')
         else:
             layout.label(text="Available Assets")
@@ -213,29 +166,21 @@ class IMESHH_PT_AssetLibraryPanel(bpy.types.Panel):
 class AuthPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
-    username: bpy.props.StringProperty(name="Username", default="")
-    password: bpy.props.StringProperty(name="Password", subtype='PASSWORD', default="")
-    access_token: bpy.props.StringProperty(name="Access Token", default="", options={'HIDDEN'})
-    assets_location: bpy.props.StringProperty(
-        name="Assets Location",
-        description="Directory to save and load asset thumbnails",
-        subtype='DIR_PATH',
-        default="",
-    )
+    username: StringProperty(name="Username", default="")
+    password: StringProperty(name="Password", subtype='PASSWORD', default="")
+    access_token: StringProperty(name="Access Token", default="", options={'HIDDEN'})
+    assets_location: StringProperty(name="Assets Location", subtype='DIR_PATH', default="")
 
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "assets_location")
         layout.prop(self, "username")
         layout.prop(self, "password")
+        layout.operator("imeshh_online.authenticate", text="Authenticate", icon='KEY_HLT')
 
-        row = layout.row()
-        row.operator("imeshh_online.authenticate", text="Authenticate", icon='KEY_HLT')
 
-        if self.access_token:
-            layout.label(text="Authenticated with token", icon='CHECKMARK')
-        else:
-            layout.label(text="Please authenticate with username and password")
+class ThumbnailItem(bpy.types.PropertyGroup):
+    preview_icon_id: IntProperty()
 
 
 class IMESHH_OT_Authenticate(bpy.types.Operator):
@@ -244,12 +189,22 @@ class IMESHH_OT_Authenticate(bpy.types.Operator):
 
     def execute(self, context):
         prefs = bpy.context.preferences.addons[__name__].preferences
-        authenticate(prefs)
+        payload = {'username': prefs.username, 'password': prefs.password}
+        
+        try:
+            response = requests.post(token_endpoint, data=payload)
+            if response.status_code == 200:
+                data = response.json()
+                prefs.access_token = data['token']
+                print("Authentication successful! Token saved.")
+                load_thumbnails(0)
+            else:
+                print(f"Failed to authenticate. Status Code: {response.status_code}")
+                print(f"Response: {response.text}")
+        except Exception as e:
+            print(f"Error during authentication: {e}")
+
         return {'FINISHED'}
-
-
-class ThumbnailItem(bpy.types.PropertyGroup):
-    preview_icon_id: bpy.props.IntProperty()
 
 
 class IMESHH_OT_LoadAsset(bpy.types.Operator):
@@ -257,6 +212,7 @@ class IMESHH_OT_LoadAsset(bpy.types.Operator):
     bl_label = "Load Asset"
 
     def execute(self, context):
+        # Logic for loading an asset goes here
         return {'FINISHED'}
 
 
@@ -266,7 +222,7 @@ class IMESHH_OT_NextPage(bpy.types.Operator):
 
     def execute(self, context):
         context.scene.current_page += 1
-        fetch_thumbnails(context.scene.current_page)
+        load_thumbnails(context.scene.current_page)
         return {'FINISHED'}
 
 
@@ -277,11 +233,12 @@ class IMESHH_OT_PrevPage(bpy.types.Operator):
     def execute(self, context):
         if context.scene.current_page > 0:
             context.scene.current_page -= 1
-            fetch_thumbnails(context.scene.current_page)
+            load_thumbnails(context.scene.current_page)
         return {'FINISHED'}
 
 
 def register():
+    register_window_manager_properties()
     bpy.utils.register_class(IMESHH_PT_AssetLibraryPanel)
     bpy.utils.register_class(AuthPreferences)
     bpy.utils.register_class(IMESHH_OT_Authenticate)
@@ -289,12 +246,13 @@ def register():
     bpy.utils.register_class(ThumbnailItem)
     bpy.utils.register_class(IMESHH_OT_NextPage)
     bpy.utils.register_class(IMESHH_OT_PrevPage)
-    bpy.types.Scene.loaded_thumbnails = bpy.props.CollectionProperty(type=ThumbnailItem)
-    bpy.types.Scene.current_page = bpy.props.IntProperty(default=0)
-    bpy.types.Scene.thumbnails_loaded = bpy.props.BoolProperty(default=False)
-    bpy.types.Scene.thumbnails_per_page = bpy.props.IntProperty(default=thumbnails_per_page)
-    bpy.app.handlers.load_post.append(on_load)
+    bpy.types.Scene.loaded_thumbnails = CollectionProperty(type=ThumbnailItem)
+    bpy.types.Scene.current_page = IntProperty(default=0)
+    bpy.types.Scene.thumbnails_loaded = BoolProperty(default=False)
+    bpy.types.Scene.thumbnails_per_page = IntProperty(default=thumbnails_per_page)
 
+    # Initialize previews
+    init_previews()
 
 def unregister():
     bpy.utils.unregister_class(IMESHH_PT_AssetLibraryPanel)
@@ -304,11 +262,14 @@ def unregister():
     bpy.utils.unregister_class(ThumbnailItem)
     bpy.utils.unregister_class(IMESHH_OT_NextPage)
     bpy.utils.unregister_class(IMESHH_OT_PrevPage)
+    
+    
+
     del bpy.types.Scene.loaded_thumbnails
     del bpy.types.Scene.current_page
     del bpy.types.Scene.thumbnails_loaded
     del bpy.types.Scene.thumbnails_per_page
-    bpy.app.handlers.load_post.remove(on_load)
+    del bpy.context.window_manager.web_asset_manager_previews  # Clean up the previews
 
 
 if __name__ == "__main__":
