@@ -20,7 +20,7 @@ import os
 import tempfile
 from bpy.types import Panel
 from .ui_main import IMESHH_main_panel
-from ..auth import auth_file_exists
+
 from .. import functions as fn
 from ..props import preview_collections
 
@@ -39,10 +39,6 @@ class IMESHH_PT_assembly(IMESHH_main_panel, Panel):
     """
 
     bl_label = "iMeshh Assembly"
-
-    @classmethod
-    def poll(cls, context):
-        return auth_file_exists()
 
     def __init__(self) -> None:
         """! Init the Panel

@@ -16,21 +16,77 @@ print("| Thank you for using our software   |")
 print("|____________________________________|")
 print("\n")
 
-
 import importlib
-from . import ops, props, auth, ui, prefs
+from . import ops, props, ui
 from bpy.utils import register_class, unregister_class
-from bpy import context
+from bpy.props import StringProperty
+from bpy.types import Operator, AddonPreferences
+import requests
 from typing import List
 
+import bpy
+import requests
+import os
+import threading
+import urllib.parse
+from bpy.utils import previews
+from bpy.props import (
+    CollectionProperty,
+    EnumProperty,
+    StringProperty,
+    IntProperty,
+    BoolProperty,
+)
+from bpy.types import Panel
 
 modules = [
-    auth,
     props,
-    prefs,
     ops,
     ui,
 ]
+
+# Configuration
+wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
+token_endpoint = wp_site_url + "/wp-json/jwt-auth/v1/token"
+products_endpoint = wp_site_url + "/wp-json/wc/v3/products"
+
+# Authentication operator (from new_init)
+class IMESHH_OT_Authenticate(Operator):
+    bl_idname = "imeshh_online.authenticate"
+    bl_label = "Authenticate"
+
+    def execute(self, context):
+        prefs = context.preferences.addons[__name__].preferences
+        payload = {'username': prefs.username, 'password': prefs.password}
+        
+        try:
+            response = requests.post(token_endpoint, data=payload)
+            if response.status_code == 200:
+                data = response.json()
+                prefs.access_token = data['token']
+                print("Authentication successful! Token saved.")
+            else:
+                print(f"Failed to authenticate. Status Code: {response.status_code}")
+                print(f"Response: {response.text}")
+        except Exception as e:
+            print(f"Error during authentication: {e}")
+
+        return {'FINISHED'}
+
+
+# Preferences for storing credentials and access token (from new_init)
+class AuthPreferences(AddonPreferences):
+    bl_idname = __name__
+
+    username: StringProperty(name="Username", default="")
+    password: StringProperty(name="Password", subtype='PASSWORD', default="")
+    access_token: StringProperty(name="Access Token", default="", options={'HIDDEN'})
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "username")
+        layout.prop(self, "password")
+        layout.operator("imeshh_online.authenticate", text="Authenticate", icon='KEY_HLT')
 
 
 # The classes to register
@@ -63,9 +119,24 @@ def register_unregister_modules(modules: List, register: bool):
 
 
 def register():
+    # Register the original modules
     register_unregister_modules(modules, True)
-    prefs.load_prefs_json()
+
+    # Register the custom property for the scene
+    bpy.types.Scene.imeshh_am = bpy.props.PointerProperty(type=IMESHH_scene_properties)
+
+    # Register authentication operator and preferences
+    bpy.utils.register_class(IMESHH_OT_Authenticate)
+    bpy.utils.register_class(AuthPreferences)
 
 
 def unregister():
+    # Unregister the original modules
     register_unregister_modules(modules, False)
+
+    # Remove the custom property from the scene
+    del bpy.types.Scene.imeshh_am
+
+    # Unregister authentication operator and preferences
+    bpy.utils.unregister_class(IMESHH_OT_Authenticate)
+    bpy.utils.unregister_class(AuthPreferences)

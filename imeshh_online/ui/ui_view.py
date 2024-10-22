@@ -1,33 +1,12 @@
-# Copyright (C) 2024 Aditia A. Pratama | aditia.ap@gmail.com
-#
-# This file is part of imeshh_am.
-#
-# imeshh_am is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# imeshh_am is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with imeshh_am.  If not, see <https://www.gnu.org/licenses/>.
 import bpy
 from bpy.types import Panel
 from .ui_main import IMESHH_main_panel
-from ..auth import auth_file_exists
 from ..functions import ADDON, enum_members_from_instance
 
 
 class IMESHH_PT_view(IMESHH_main_panel, Panel):
     bl_label = "imeshh view panel"
     bl_options = {"DEFAULT_CLOSED"}
-
-    @classmethod
-    def poll(cls, context):
-        return auth_file_exists()
 
     def __init__(self) -> None:
         super().__init__()

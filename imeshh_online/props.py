@@ -1,24 +1,24 @@
-# Copyright (C) 2024 Aditia A. Pratama | aditia.ap@gmail.com
-#
-# This file is part of imeshh_am.
-#
-# imeshh_am is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# imeshh_am is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with imeshh_am.  If not, see <https://www.gnu.org/licenses/>.
+__all__ = [
+    "download_zip_file_async",
+    "get_headers",
+    "load_previews",
+    "load_web_categories",
+    "on_change_dld",
+    "on_change_main_folder",
+    "on_change_subdir",
+    "on_change_tab",
+    "on_change_web_categories",
+    "update_and_set_preview",
+    "update_previews",
+]
+
+
 import bpy
 import os
 import shutil
 import json
 import pathlib
+import requests
 from threading import Timer
 from os import path
 from bpy.utils import previews
@@ -32,7 +32,6 @@ from bpy.props import (
 )
 from bpy.types import Scene, PropertyGroup, WindowManager
 from zipfile import ZipFile
-from . import auth
 from . import functions as fn
 from . import util as ut
 
@@ -48,6 +47,14 @@ wp_v2 = wp_json + "wp/v2/"
 wp_imeshh = wp_blenderapi + "imeshhs/"
 wp_product_cat = wp_v2 + "product_cat/"
 
+def get_headers(context):
+    """Retrieve the authentication headers using the access token from preferences."""
+    prefs = context.preferences.addons[ADDON].preferences
+    token = prefs.access_token
+    if not token:
+        print("No access token found. Please authenticate.")
+        return None
+    return {"Authorization": f"Bearer {token}"}
 
 def on_change_main_folder(cls, context):
     # clear subdir display
@@ -80,8 +87,6 @@ def update_previews(cls, context):
     ):
         if context.scene.imeshh_am.ui_folder_list:
             items = []
-            # from . import preview_collections
-
             curr_dir = context.scene.imeshh_am.ui_folder_list[-1].start_folder
             if path.exists(curr_dir):
                 assets = fn.get_all_sub_assets(curr_dir, context)
@@ -156,10 +161,6 @@ def on_change_dld(cls, context):
     update_and_set_preview(cls, context)
 
 
-def load_previews_to_disk(self, context, search):
-    """Save Load previews to Disk for faster reload"""
-
-
 def load_previews(self, context, search):
     """EnumProperty callback"""
     global wp_imeshh
@@ -171,11 +172,19 @@ def load_previews(self, context, search):
         return enum_items
 
     pcoll = preview_collections["web"]
-    request = auth.get_access(wp_imeshh)
+    headers = get_headers(context)
 
-    if 200 != request.status_code:
-        # TODO: Show alert message.
-        print("Failed to access API")
+    if not headers:
+        return enum_items
+
+    try:
+        request = requests.get(wp_imeshh, headers=headers)
+    except Exception as e:
+        print(f"Failed to access API: {e}")
+        return enum_items
+
+    if request.status_code != 200:
+        print("Failed to access API:", request.status_code, request.text)
         return enum_items
 
     json_str = request.content
@@ -202,9 +211,7 @@ def load_previews(self, context, search):
                 None,
             )
             if parent_cat:
-                parent_data_url = auth.get_access(
-                    wp_product_cat + str(parent_cat) + "/"
-                )
+                parent_data_url = requests.get(wp_product_cat + str(parent_cat) + "/", headers=headers)
                 parent_data_str = parent_data_url.content
                 parent_data_load = json.loads(parent_data_str)
                 parent_cat_name = parent_data_load["slug"]
@@ -248,9 +255,6 @@ def load_previews(self, context, search):
 
     ut.ui_redraw()
     pcoll.my_previews_loading = False
-    # print(pcoll.my_previews_data)
-
-    # print(preview_collections["web"])
 
     return pcoll.my_previews
 
@@ -260,26 +264,27 @@ def load_web_categories(self, context):
 
     global ADDON
     global wp_imeshh
-    # print("Load Web Cat...")
     enum_items = []
 
     if context is None:
         return enum_items
 
-    # Get the categories list from web (defined in register func).
     pcoll = the_categories["web"]
     prefs = context.preferences.addons[ADDON].preferences
 
-    # if ":" not in prefs["my_login"]:
-    #     # TODO: Show alert message.
-    #     print("Login not set in preferences")
-    #     return enum_items
+    headers = get_headers(context)
 
-    request = auth.get_access(wp_imeshh)
+    if not headers:
+        return enum_items
 
-    if 200 != request.status_code:
-        # TODO: Show alert message.
-        print("Failed to access API")
+    try:
+        request = requests.get(wp_imeshh, headers=headers)
+    except Exception as e:
+        print(f"Failed to access API: {e}")
+        return enum_items
+
+    if request.status_code != 200:
+        print("Failed to access API:", request.status_code, request.text)
         return enum_items
 
     json_str = request.content
@@ -291,116 +296,54 @@ def load_web_categories(self, context):
     pcoll.clear()
 
     pcoll.my_categories = enum_items
-    # pcoll.my_categories_search_hash = search
     ut.ui_redraw()
-    # data.screens["Layout"].areas[3].regions[2].tag_redraw()
-
     pcoll.my_categories_loading = False
 
     return pcoll.my_categories
 
 
-def enum_previews_from_directory_items(self, context):
-    """! Loads imeges from web"""
-    enum_items = []
-
-    if context is None:
-        return enum_items
-
-    # from . import preview_collections
-
-    pcoll = preview_collections["web"]
-
-    if pcoll.my_previews_loading:
-        return enum_items
-
-    search = context.scene.imeshh_am.search_bar.lower()
-
-    if pcoll.my_previews_search_hash == search:
-        return pcoll.my_previews
-
-    pcoll.my_previews_loading = True
-
-    t = Timer(0.2, load_previews, [self, context, search])
-
-    t.start()
-    # print(preview_collections)
-    return pcoll.my_previews
-
-
-def enum_categories_from_directory_items(self, context):
-    """! Loads categories from web"""
-
-    # "Load Enum Categories..."
-    enum_items = []
-    search = context.scene.imeshh_am.search_bar.lower()
-
-    if context is None:
-        return enum_items
-
-    pcoll = the_categories["web"]
-
-    if pcoll.my_categories_loading:
-        return enum_items
-
-    if pcoll.my_categories_search_hash == search:
-        return pcoll.my_categories
-
-    pcoll.my_categories_loading = True
-
-    t = Timer(0.2, load_web_categories, [self, context])
-    t.start()
-
-    # print(the_categories)
-
-    return pcoll.my_categories
-
-
 def download_zip_file_async(url, suffix=False):
-    preview_collections["main"].my_previews_loading = True
-    bpy.context.scene.imeshh_am.downloading = True
-    t = Timer(0.1, download_zip_file, [url, suffix])
-    t.start()
-    # ut.ui_redraw()
+    """Download and extract a zip file asynchronously."""
+    def download_and_extract():
+        preview_collections["main"].my_previews_loading = True
+        bpy.context.scene.imeshh_am.downloading = True
+        try:
+            file = fn.get_downloaded_file(suffix, url)
+            file_name = pathlib.Path(file).stem
+            imeshh_tmp_dir = fn.get_user_folder(suffix)
 
+            with ZipFile(file, "r") as zObject:
+                for info in zObject.infolist():
+                    if not info.is_dir():
+                        pathlist = [p for p in info.filename.split(os.sep, 1)]
+                        filepath = (
+                            os.path.join(imeshh_tmp_dir, pathlist[1])
+                            if len(pathlist) > 1
+                            else os.path.join(imeshh_tmp_dir, pathlist[0])
+                        )
+                        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                        with zObject.open(info) as source, open(filepath, "wb") as target:
+                            shutil.copyfileobj(source, target)
 
-def download_zip_file(url, suffix=False):
-    file = fn.get_downloaded_file(suffix, url)
-    file_name = pathlib.Path(file).stem
-    # print(file_name)
-    imeshh_tmp_dir = fn.get_user_folder(suffix)
+            # Load extracted blend files
+            files = fn.get_blend_files(imeshh_tmp_dir)
+            for file in files:
+                with bpy.data.libraries.load(file, link=False) as (data_from, data_to):
+                    data_to.objects = data_from.objects
 
-    # if not path.exists(path.join(imeshh_tmp_dir, file_name)):
-    try:
-        with ZipFile(file, "r") as zObject:
-            for info in zObject.infolist():
-                if not info.is_dir():
-                    pathlist = [p for p in info.filename.split(os.sep, 1)]
-                    filepath = (
-                        os.path.join(imeshh_tmp_dir, pathlist[1])
-                        if len(pathlist) > 1
-                        else os.path.join(imeshh_tmp_dir, pathlist[0])
-                    )
-                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                    with zObject.open(info) as source, open(filepath, "wb") as target:
-                        shutil.copyfileobj(source, target)
-    except:
-        pass
+                for obj in data_to.objects:
+                    if obj is not None:
+                        bpy.context.collection.objects.link(obj)
 
-    files = fn.get_blend_files(imeshh_tmp_dir)
+        except Exception as e:
+            print(f"Error during async zip download or extraction: {e}")
 
-    for file in files:
-        with bpy.data.libraries.load(file, link=False) as (data_from, data_to):
-            data_to.objects = data_from.objects
+        finally:
+            preview_collections["main"].my_previews_loading = False
+            bpy.context.scene.imeshh_am.downloading = False
 
-        for obj in data_to.objects:
-            if obj is not None:
-                bpy.context.collection.objects.link(obj)
-
-    preview_collections["main"].my_previews_loading = False
-    bpy.context.scene.imeshh_am.downloading = False
-    # ut.ui_redraw()
-
+    # Start the download and extraction in a separate thread
+    Timer(0.1, download_and_extract).start()
 
 class UIFolder(PropertyGroup):
     start_folder: StringProperty(name="start folder", default="")  # type: ignore
@@ -511,9 +454,9 @@ class PathString(PropertyGroup):
         name="Types",
         description="Selected tab",
     )  # type: ignore
-
-
-registry = [
+    
+    
+    registry = [
     PathString,
     UIFolder,
     IMESHH_scene_properties,
@@ -539,7 +482,7 @@ def register():
     preview_coll.my_previews_loading = False
     # Web preview enum
     WindowManager.web_asset_manager_previews = EnumProperty(
-        items=enum_previews_from_directory_items
+        
     )
     WindowManager.imeshh_dir = StringProperty(name="Default Folder", subtype="DIR_PATH")
     preview_collections["web"] = preview_coll
