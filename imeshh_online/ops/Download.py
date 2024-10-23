@@ -37,7 +37,7 @@ class IMESHH_OT_download(Operator):
         #  "Downloading asset"
         from ..props import preview_collections
 
-        selected = int(context.window_manager.web_asset_manager_previews)
+        selected = int(context.window_manager.asset_manager_previews)
         item = preview_collections["web"].my_previews_data[selected]
         basename = path.splitext(path.basename(item["image_url"]))[0]
         cat_path = [c["slug"] for c in item["categories"]]

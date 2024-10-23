@@ -33,24 +33,24 @@ thumbnails_per_page = 12
 preview_collections = {}
 
 def register_window_manager_properties():
-    if not hasattr(bpy.types.WindowManager, "web_asset_manager_previews"):
-        bpy.types.WindowManager.web_asset_manager_previews = EnumProperty(items=lambda self, context: update_web_previews(self, context))
+    if not hasattr(bpy.types.WindowManager, "asset_manager_previews"):
+        bpy.types.WindowManager.asset_manager_previews = EnumProperty(items=lambda self, context: update_web_previews(self, context))
 
 def unregister_window_manager_properties():
-    if hasattr(bpy.types.WindowManager, "web_asset_manager_previews"):
-        del bpy.types.WindowManager.web_asset_manager_previews
+    if hasattr(bpy.types.WindowManager, "asset_manager_previews"):
+        del bpy.types.WindowManager.asset_manager_previews
 
 def init_previews():
     """Initialize the preview collections."""
     pcoll = previews.new()
     pcoll.my_previews = []
     pcoll.my_previews_data = {}
-    bpy.context.window_manager.web_asset_manager_previews = pcoll  # Store as EnumProperty
+    bpy.context.window_manager.asset_manager_previews = pcoll  # Store as EnumProperty
 
 def update_web_previews(self, context):
     """Update the previews list value."""
     global preview_collections
-    pcoll = bpy.context.window_manager.web_asset_manager_previews
+    pcoll = bpy.context.window_manager.asset_manager_previews
     items = []
 
     for asset in pcoll.my_previews_data.values():
@@ -124,7 +124,7 @@ def load_thumbnails(page=0):
                 
                 if image:
                     # Use the previews collection
-                    preview = bpy.context.window_manager.web_asset_manager_previews.load(image.name, thumbnail_path, 'IMAGE')
+                    preview = bpy.context.window_manager.asset_manager_previews.load(image.name, thumbnail_path, 'IMAGE')
                     if preview:
                         thumbnail_item = bpy.context.scene.loaded_thumbnails.add()
                         thumbnail_item.preview_icon_id = preview.icon_id
@@ -269,7 +269,7 @@ def unregister():
     del bpy.types.Scene.current_page
     del bpy.types.Scene.thumbnails_loaded
     del bpy.types.Scene.thumbnails_per_page
-    del bpy.context.window_manager.web_asset_manager_previews  # Clean up the previews
+    del bpy.context.window_manager.asset_manager_previews  # Clean up the previews
 
 
 if __name__ == "__main__":

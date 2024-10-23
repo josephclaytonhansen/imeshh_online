@@ -70,12 +70,12 @@ class IMESHH_PT_assembly(IMESHH_main_panel, Panel):
             col.label(text="Please set your Default", icon="FILEBROWSER")
             col.label(text="Folder in User Preferences", icon="BLANK1")
 
-        previews = context.window_manager.web_asset_manager_previews
+        previews = context.window_manager.asset_manager_previews
         downloading = bpy.context.scene.imeshh_am.downloading
         if previews:
             row.template_icon_view(
                 context.window_manager,
-                "web_asset_manager_previews",
+                "asset_manager_previews",
                 show_labels=True,
                 scale_popup=context.preferences.addons[
                     fn.ADDON
