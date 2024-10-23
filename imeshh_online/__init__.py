@@ -78,15 +78,41 @@ class IMESHH_OT_Authenticate(Operator):
 class AuthPreferences(AddonPreferences):
     bl_idname = __name__
 
+    # Existing properties
     username: StringProperty(name="Username", default="")
     password: StringProperty(name="Password", subtype='PASSWORD', default="")
     access_token: StringProperty(name="Access Token", default="", options={'HIDDEN'})
+    
+    # Missing properties added
+    scale_ui_popup: IntProperty(
+        name="UI Scale Popup",
+        description="Adjust scale of UI popup",
+        default=5,
+        min=1,
+        max=10
+    )
+
+    default_folder: StringProperty(
+        name="Default Folder",
+        description="Folder where assets are downloaded",
+        subtype='DIR_PATH',
+        default=""
+    )
+
+    paths: CollectionProperty(
+        name="Asset Paths",
+        description="Paths for different asset types",
+        type=bpy.types.PropertyGroup  # Adjust if you have a specific PropertyGroup
+    )
 
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "username")
         layout.prop(self, "password")
+        layout.prop(self, "default_folder")  # Adding this to the UI
+        layout.prop(self, "scale_ui_popup")  # Adding this to the UI
         layout.operator("imeshh_online.authenticate", text="Authenticate", icon='KEY_HLT')
+
 
 
 # The classes to register
@@ -121,9 +147,6 @@ def register_unregister_modules(modules: List, register: bool):
 def register():
     # Register the original modules
     register_unregister_modules(modules, True)
-
-    # Register the custom property for the scene
-    bpy.types.Scene.imeshh_am = bpy.props.PointerProperty(type=IMESHH_scene_properties)
 
     # Register authentication operator and preferences
     bpy.utils.register_class(IMESHH_OT_Authenticate)

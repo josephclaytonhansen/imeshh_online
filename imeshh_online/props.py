@@ -393,7 +393,7 @@ class IMESHH_scene_properties(PropertyGroup):
     tabs: EnumProperty(
         # (identifier, name, description, icon, number)
         items=[
-            ("OBJECT", "Object", "Object tab", "MESH_MONKEY", 0),
+            ("OBJECT", "Object", "Object tab", "MESH_/MONKEY", 0),
             ("MATERIAL", "Material", "Material tab", "MATERIAL", 1),
             ("HDRI", "Hdri", "Hdri tab", "WORLD_DATA", 2),
         ],
@@ -456,7 +456,7 @@ class PathString(PropertyGroup):
     )  # type: ignore
     
     
-    registry = [
+registry = [
     PathString,
     UIFolder,
     IMESHH_scene_properties,
@@ -464,6 +464,7 @@ class PathString(PropertyGroup):
 
 
 def register():
+    
     # Load the Asset Manager UI
     Scene.imeshh_am = PointerProperty(type=IMESHH_scene_properties)
 
@@ -481,9 +482,7 @@ def register():
     preview_coll.my_previews_search_hash = -1
     preview_coll.my_previews_loading = False
     # Web preview enum
-    WindowManager.web_asset_manager_previews = EnumProperty(
-        
-    )
+
     WindowManager.imeshh_dir = StringProperty(name="Default Folder", subtype="DIR_PATH")
     preview_collections["web"] = preview_coll
 
