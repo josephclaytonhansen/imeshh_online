@@ -58,7 +58,7 @@ MAX_THREADS = 20
 
 def is_authenticated():
     """Check if the user is authenticated by verifying the presence of the access token."""
-    prefs = bpy.context.preferences.addons[__name__].preferences
+    prefs = bpy.context.preferences.addons['imeshh_online'].preferences
     return bool(prefs.access_token)
 
 def download_all_thumbnails():
@@ -164,7 +164,7 @@ class IMeshh_Manager():
 
     def get_thumbnail_location(self, asset):
         """Get the location to save the thumbnail for the given asset."""
-        prefs = bpy.context.preferences.addons[__name__].preferences
+        prefs = bpy.context.preferences.addons["imeshh_online"].preferences
         default_folder = Path(prefs.default_folder)
 
         # Create the 'thumbs' folder inside the user's selected folder

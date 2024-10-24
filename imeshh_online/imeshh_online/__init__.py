@@ -1,15 +1,16 @@
-from . import manager
-from . import operators
-from . import ui
-
 bl_info = {
-    "name": "iMeshh Online",
+    "name": "imeshh_online",
     "author": "iMeshh Ltd",
     "version": (0, 3, 3),
     "blender": (3, 6, 0),
     "category": "Asset Manager",
     "location": "View3D > Tools > iMeshh Online",
 }
+
+from . import manager
+from . import operators
+from . import ui
+
 
 from bpy.props import StringProperty
 from bpy.types import Operator, AddonPreferences
@@ -57,7 +58,7 @@ class IMESHH_OT_Authenticate(Operator):
 
 # Preferences for storing credentials and access token (from new_init)
 class AuthPreferences(AddonPreferences):
-    bl_idname = __name__
+    bl_idname = "imeshh_online"
 
     # Existing properties
     username: StringProperty(name="Username", default="")

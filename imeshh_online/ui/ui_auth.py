@@ -10,7 +10,7 @@ class IMESHH_PT_view(IMESHH_main_panel, Panel):
     @classmethod
     def poll(cls, context):
         # Check if the user is authenticated by looking for the access token in the preferences
-        prefs = bpy.context.preferences.addons[__name__].preferences
+        prefs = bpy.context.preferences.addons["imeshh_online"].preferences
         return bool(prefs.access_token)  # Returns True if an access token is available, meaning the user is authenticated
 
     def __init__(self) -> None:

@@ -62,7 +62,7 @@ class IMESHH_PT_assembly(IMESHH_main_panel, Panel):
             row.prop_enum(context.scene.imeshh_am, "downloads", value=item, text="")
         row = col.row()
         # col.row().separator(factor=3)
-        prefs = bpy.context.preferences.addons[fn.ADDON].preferences
+        prefs = bpy.context.preferences.addons["imeshh_online"].preferences
         if prefs.default_folder == str(tempfile.gettempdir()):
             box = col.box()
             col = box.column_flow(columns=0, align=True)

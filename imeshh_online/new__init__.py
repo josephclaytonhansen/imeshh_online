@@ -59,7 +59,7 @@ def update_web_previews(self, context):
     return items
 
 def fetch_assets(page=0):
-    prefs = bpy.context.preferences.addons[__name__].preferences
+    prefs = bpy.context.preferences.addons["imeshh_online"].preferences
     headers = {"Authorization": f"Bearer {prefs.access_token}"}
     params = {"per_page": thumbnails_per_page, "page": page + 1}
 
@@ -107,7 +107,7 @@ def load_thumbnail_image(thumbnail_path):
 
 def load_thumbnails(page=0):
     bpy.context.scene.thumbnails_loaded = False
-    prefs = bpy.context.preferences.addons[__name__].preferences
+    prefs = bpy.context.preferences.addons["imeshh_online"].preferences
     save_dir = prefs.assets_location
     bpy.context.scene.loaded_thumbnails.clear()
 
@@ -188,7 +188,7 @@ class IMESHH_OT_Authenticate(bpy.types.Operator):
     bl_label = "Authenticate"
 
     def execute(self, context):
-        prefs = bpy.context.preferences.addons[__name__].preferences
+        prefs = bpy.context.preferences.addons["imeshh_online"].preferences
         payload = {'username': prefs.username, 'password': prefs.password}
         
         try:
