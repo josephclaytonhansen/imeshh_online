@@ -59,7 +59,7 @@ MAX_THREADS = 20
 def is_authenticated():
     """Check if the user is authenticated by verifying the presence of the access token."""
     prefs = bpy.context.preferences.addons['imeshh_online'].preferences
-    return bool(prefs.access_token)
+    return prefs.access_token != ''
 
 def download_all_thumbnails():
     global _manager

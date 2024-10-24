@@ -21,7 +21,12 @@ class LayoutDemoPanel(bpy.types.Panel):
         row = layout.row()
         row.label(text=_manager.query_fetch_status.name)
         row.label(text=_manager.bgq_status.name)
-        _manager.build_ui(layout,context)
+        prefs = bpy.context.preferences.addons["imeshh_online"].preferences 
+        if prefs.default_folder == "":
+            box = layout.box()
+            box.label(text="Please set your Default Folder in User Preferences", icon="ERROR")
+        else:
+            _manager.build_ui(layout,context)
 
 
 classes = [LayoutDemoPanel]
