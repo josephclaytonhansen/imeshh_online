@@ -10,7 +10,7 @@ bl_info = {
 from . import manager
 from . import operators
 from . import ui
-
+from . import secrets
 
 from bpy.props import StringProperty
 from bpy.types import Operator, AddonPreferences
@@ -27,43 +27,22 @@ from bpy.props import (
 )
 from bpy.types import Panel
 
-# Configuration
+## Configuration
 wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
 token_endpoint = wp_site_url + "/wp-json/jwt-auth/v1/token"
-products_endpoint = wp_site_url + "/wp-json/wc/v3/products"
+subscriptions_endpoint = wp_site_url + "/wp-json/wc/v1/subscriptions"
 
-# Authentication operator (from new_init)
-class IMESHH_OT_Authenticate(Operator):
-    bl_idname = "imeshh_online.authenticate"
-    bl_label = "Authenticate"
+env_vars = secrets.get_secrets()
+wc_consumer_key = env_vars.get("WC_CONSUMER_KEY")
+wc_consumer_secret = env_vars.get("WC_CONSUMER_SECRET")
 
-    def execute(self, context):
-        prefs = context.preferences.addons[__name__].preferences
-        payload = {'username': prefs.username, 'password': prefs.password}
-        
-        try:
-            response = requests.post(token_endpoint, data=payload)
-            if response.status_code == 200:
-                data = response.json()
-                prefs.access_token = data['token']
-                print("Authentication successful! Token saved.")
-            else:
-                print(f"Failed to authenticate. Status Code: {response.status_code}")
-                print(f"Response: {response.text}")
-        except Exception as e:
-            print(f"Error during authentication: {e}")
-
-        return {'FINISHED'}
-
-
-# Preferences for storing credentials and access token (from new_init)
 class AuthPreferences(AddonPreferences):
     bl_idname = "imeshh_online"
 
-    # Existing properties
     username: StringProperty(name="Username", default="")
     password: StringProperty(name="Password", subtype='PASSWORD', default="")
     access_token: StringProperty(name="Access Token", default="", options={'HIDDEN'})
+    subscription_id: IntProperty(name="Subscription ID", default=0, options={'HIDDEN'})  # New hidden property
     show_asset_name: BoolProperty(name="Show Asset Names in Browser", default=True)
 
     default_folder: StringProperty(
@@ -76,7 +55,7 @@ class AuthPreferences(AddonPreferences):
     paths: CollectionProperty(
         name="Asset Paths",
         description="Paths for different asset types",
-        type=bpy.types.PropertyGroup  # Adjust if you have a specific PropertyGroup
+        type=bpy.types.PropertyGroup
     )
 
     def draw(self, context):
@@ -85,8 +64,64 @@ class AuthPreferences(AddonPreferences):
         layout.prop(self, "password")
         layout.prop(self, "default_folder")
         layout.prop(self, "show_asset_name")
-        layout.operator("imeshh_online.authenticate", text="Authenticate", icon='KEY_HLT')
+        layout.operator("imeshh_online.authenticate_and_check_subscription", text="Authenticate & Check Subscription", icon='KEY_HLT')
 
+
+# Authentication and subscription check operator
+class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
+    bl_idname = "imeshh_online.authenticate_and_check_subscription"
+    bl_label = "Authenticate & Check Subscription"
+
+    def execute(self, context):
+        prefs = context.preferences.addons[__name__].preferences
+        payload = {'username': prefs.username, 'password': prefs.password}
+        
+        # Step 1: Authenticate
+        try:
+            response = requests.post(token_endpoint, data=payload)
+            if response.status_code == 200:
+                data = response.json()
+                prefs.access_token = data['token']
+                print("Authentication successful! Token saved.")
+            else:
+                print(f"Failed to authenticate. Status Code: {response.status_code}")
+                print(f"Response: {response.text}")
+                return {'CANCELLED'}
+        except Exception as e:
+            print(f"Error during authentication: {e}")
+            return {'CANCELLED'}
+
+        # Step 2: Check subscription
+        headers = {
+            "Authorization": f"Bearer {prefs.access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            response = requests.get(
+                subscriptions_endpoint,
+                auth=(wc_consumer_key, wc_consumer_secret),
+                headers=headers,
+                params={"customer": prefs.username}  # Adjust based on user identifier
+            )
+            
+            if response.status_code == 200:
+                subscriptions = response.json()
+                if subscriptions:
+                    # Assume the first subscription is the one to use
+                    subscription = subscriptions[0]
+                    prefs.subscription_id = subscription['id']
+                    print(f"Subscription ID {prefs.subscription_id} saved.")
+                else:
+                    print("No subscriptions found for this user.")
+            else:
+                print(f"Failed to retrieve subscriptions. Status Code: {response.status_code}")
+                print(f"Response: {response.text}")
+        
+        except Exception as e:
+            print(f"Error retrieving subscription information: {e}")
+
+        return {'FINISHED'}
 
 def register():
     manager.register()
@@ -94,7 +129,7 @@ def register():
     ui.register()
     
     bpy.utils.register_class(AuthPreferences)
-    bpy.utils.register_class(IMESHH_OT_Authenticate)
+    bpy.utils.register_class(IMESHH_OT_AuthenticateAndCheckSubscription)
     
 
 
@@ -103,8 +138,8 @@ def unregister():
     operators.unregister()
     manager.unregister()
     
-    bpy.utils.unregister_class(IMESHH_OT_Authenticate)
     bpy.utils.unregister_class(AuthPreferences)
+    bpy.utils.unregister_class(IMESHH_OT_AuthenticateAndCheckSubscription)
 
 if __name__ == "__main__":
     register()
