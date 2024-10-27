@@ -17,6 +17,7 @@ from .t3dn_bip import previews
 from bpy.utils.previews import ImagePreviewCollection
 from bpy.types import ImagePreview
 from bpy.props import EnumProperty,StringProperty
+import ctypes
 # from requests import Response
 BASE_URL = "https://shop.imeshh.com"
 STORE = BASE_URL + '/wp-json/wc/store/v1'
@@ -171,6 +172,16 @@ class IMeshh_Manager():
         thumbs_folder = default_folder / 'thumbs'
         if not thumbs_folder.exists():
             thumbs_folder.mkdir(parents=True, exist_ok=True)
+            # Make the 'thumbs' folder hidden
+            try:
+                if os.name == 'nt':
+                    FILE_ATTRIBUTE_HIDDEN = 0x02
+                    ctypes.windll.kernel32.SetFileAttributesW(str(thumbs_folder), FILE_ATTRIBUTE_HIDDEN)
+                elif os.name == 'posix':
+                    os.system(f"chflags hidden {thumbs_folder}")
+            except Exception as e:
+                print(f"Failed to hide folder: {e}")
+
 
         # Generate the thumbnail path inside the 'thumbs' folder
         thumbnail_filename = f"{asset['id']}_{asset['slug']}.png"
