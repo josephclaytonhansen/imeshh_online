@@ -67,7 +67,6 @@ class AuthPreferences(AddonPreferences):
         layout.operator("imeshh_online.authenticate_and_check_subscription", text="Authenticate & Check Subscription", icon='KEY_HLT')
 
 
-# Authentication and subscription check operator
 class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
     bl_idname = "imeshh_online.authenticate_and_check_subscription"
     bl_label = "Authenticate & Check Subscription"
@@ -91,22 +90,48 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
             print(f"Error during authentication: {e}")
             return {'CANCELLED'}
 
-        # Step 2: Check subscription
+        # Step 2: Get User ID
         headers = {
             "Authorization": f"Bearer {prefs.access_token}",
             "Content-Type": "application/json"
         }
-        
+
         try:
-            response = requests.get(
+            user_response = requests.get(
+                f"{wp_site_url}/wp-json/wc/v3/customers",
+                auth=(wc_consumer_key, wc_consumer_secret),
+                headers=headers,
+                params={"search": prefs.username}  # Adjust based on how you're identifying users
+            )
+            
+            if user_response.status_code == 200:
+                users = user_response.json()
+                if users:
+                    user_id = users[0]['id']  # Assume the first match is the correct user
+                    print(f"User ID found: {user_id}")
+                else:
+                    print("No user found with that username.")
+                    return {'CANCELLED'}
+            else:
+                print(f"Failed to retrieve user. Status Code: {user_response.status_code}")
+                print(f"Response: {user_response.text}")
+                return {'CANCELLED'}
+        
+        except Exception as e:
+            print(f"Error retrieving user information: {e}")
+            return {'CANCELLED'}
+
+        # Step 3: Check subscription
+        try:
+            subscription_response = requests.get(
                 subscriptions_endpoint,
                 auth=(wc_consumer_key, wc_consumer_secret),
                 headers=headers,
-                params={"customer": prefs.username}  # Adjust based on user identifier
+                params={"customer": user_id}  # Use the integer user ID
             )
             
-            if response.status_code == 200:
-                subscriptions = response.json()
+            if subscription_response.status_code == 200:
+                subscriptions = subscription_response.json()
                 if subscriptions:
                     # Assume the first subscription is the one to use
                     subscription = subscriptions[0]
@@ -115,13 +140,14 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
                 else:
                     print("No subscriptions found for this user.")
             else:
-                print(f"Failed to retrieve subscriptions. Status Code: {response.status_code}")
-                print(f"Response: {response.text}")
+                print(f"Failed to retrieve subscriptions. Status Code: {subscription_response.status_code}")
+                print(f"Response: {subscription_response.text}")
         
         except Exception as e:
             print(f"Error retrieving subscription information: {e}")
 
         return {'FINISHED'}
+
 
 def register():
     manager.register()
