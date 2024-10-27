@@ -38,6 +38,17 @@ def _make_item(enum_name, id_, name, descr, preview_id, uid, is_icon=False):
 
     return _item_map[enum_name][lookup]
 
+class OBJECT_OT_ClickAsset(bpy.types.Operator):
+    bl_idname = "object.click_asset"
+    bl_label = "Click Asset"
+    
+    asset_name: StringProperty()
+
+    def execute(self, context):
+        print(f"Clicked on asset: {self.asset_name}")
+
+        return {'FINISHED'}
+
 redraw_queue = Queue()
 def execute_queued_items():
     while not redraw_queue.empty():
@@ -632,11 +643,12 @@ class IMeshh_Manager():
         # print("current page: ", self.current_page)
         assets = self.get_display_assets(self.current_page)
         for asset in assets:
-            # print(asset)
             cell = grid.column().box()
             icon_id = self.get_thumbnail(asset)
-            cell.template_icon(icon_value=icon_id, scale = 3)
-            cell.label(text = asset["name"])
+
+            op = cell.operator("object.click_asset", text="", icon=icon_id)
+            op.asset_name = asset["name"]
+            cell.label(text=asset["name"])
     
     def build_ui(self, layout:bpy.types.UILayout, context):
         row = layout.row(align=True)
@@ -652,8 +664,10 @@ print("_manager created: ", _manager)
 def register():
     global _manager
     _manager.register()
+    bpy.utils.register_class(OBJECT_OT_ClickAsset)
 
 def unregister():
+    bpy.utils.unregister_class(OBJECT_OT_ClickAsset)
     global _manager
     if _manager.thread_pool is not None:
         _manager.thread_pool.shutdown(wait=True)

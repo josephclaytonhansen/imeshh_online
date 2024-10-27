@@ -22,13 +22,14 @@ class LayoutDemoPanel(bpy.types.Panel):
         row.label(text=_manager.query_fetch_status.name)
         row.label(text=_manager.bgq_status.name)
         prefs = bpy.context.preferences.addons["imeshh_online"].preferences 
+
         if prefs.default_folder == "":
             box = layout.box()
             box.label(text="Please set your Default Folder in User Preferences", icon="ERROR")
-        elif prefs.access_token == "":
+        if prefs.access_token == "":
             box = layout.box()
             box.label(text="Please authenticate to access ImeshhWeb", icon="ERROR")
-        else:
+        if prefs.default_folder != "" and prefs.access_token != "":
             _manager.build_ui(layout,context)
 
 
