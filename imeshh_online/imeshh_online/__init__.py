@@ -89,19 +89,19 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
         except Exception as e:
             print(f"Error during authentication: {e}")
             return {'CANCELLED'}
-
-        # Step 2: Get User ID
+        
         headers = {
             "Authorization": f"Bearer {prefs.access_token}",
             "Content-Type": "application/json"
         }
 
+        # Step 2: Get User ID by Email
         try:
             user_response = requests.get(
                 f"{wp_site_url}/wp-json/wc/v3/customers",
                 auth=(wc_consumer_key, wc_consumer_secret),
                 headers=headers,
-                params={"search": prefs.username}  # Adjust based on how you're identifying users
+                params={"search": prefs.username}  # Change this line to search by email
             )
             
             if user_response.status_code == 200:
@@ -110,13 +110,13 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
                     user_id = users[0]['id']  # Assume the first match is the correct user
                     print(f"User ID found: {user_id}")
                 else:
-                    print("No user found with that username.")
+                    print("No user found with that email.")
                     return {'CANCELLED'}
             else:
                 print(f"Failed to retrieve user. Status Code: {user_response.status_code}")
                 print(f"Response: {user_response.text}")
                 return {'CANCELLED'}
-        
+            
         except Exception as e:
             print(f"Error retrieving user information: {e}")
             return {'CANCELLED'}
