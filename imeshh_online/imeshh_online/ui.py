@@ -25,6 +25,9 @@ class LayoutDemoPanel(bpy.types.Panel):
         if prefs.default_folder == "":
             box = layout.box()
             box.label(text="Please set your Default Folder in User Preferences", icon="ERROR")
+        elif prefs.access_token == "":
+            box = layout.box()
+            box.label(text="Please authenticate to access ImeshhWeb", icon="ERROR")
         else:
             _manager.build_ui(layout,context)
 
