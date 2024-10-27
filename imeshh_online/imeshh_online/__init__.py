@@ -64,15 +64,6 @@ class AuthPreferences(AddonPreferences):
     username: StringProperty(name="Username", default="")
     password: StringProperty(name="Password", subtype='PASSWORD', default="")
     access_token: StringProperty(name="Access Token", default="", options={'HIDDEN'})
-    
-    # Missing properties added
-    scale_ui_popup: IntProperty(
-        name="UI Scale Popup",
-        description="Adjust scale of UI popup",
-        default=5,
-        min=1,
-        max=10
-    )
 
     default_folder: StringProperty(
         name="Default Folder",
@@ -91,8 +82,7 @@ class AuthPreferences(AddonPreferences):
         layout = self.layout
         layout.prop(self, "username")
         layout.prop(self, "password")
-        layout.prop(self, "default_folder")  # Adding this to the UI
-        layout.prop(self, "scale_ui_popup")  # Adding this to the UI
+        layout.prop(self, "default_folder")
         layout.operator("imeshh_online.authenticate", text="Authenticate", icon='KEY_HLT')
 
 
