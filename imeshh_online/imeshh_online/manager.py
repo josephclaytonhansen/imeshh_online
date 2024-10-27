@@ -645,11 +645,12 @@ class IMeshh_Manager():
         for asset in assets:
             cell = grid.column().box()
             icon_id = self.get_thumbnail(asset)
-
-            op = cell.operator("object.click_asset", text="", icon=icon_id)
-            op.asset_name = asset["name"]
-            cell.label(text=asset["name"])
-    
+            cell.template_icon(icon_value=icon_id, scale = 3)
+            cell.operator("object.click_asset",text="Download").asset_name = asset["name"]
+            label_len = asset["name"].len()//2
+            cell.label(text=asset["name"][:label_len])
+            cell.label(text=asset["name"][label_len:])
+            
     def build_ui(self, layout:bpy.types.UILayout, context):
         row = layout.row(align=True)
         row.prop(context.scene,"imeshh_search",text='',icon="VIEWZOOM")    
