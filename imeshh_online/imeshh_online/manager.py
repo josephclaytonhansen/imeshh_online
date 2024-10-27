@@ -647,9 +647,11 @@ class IMeshh_Manager():
             icon_id = self.get_thumbnail(asset)
             cell.template_icon(icon_value=icon_id, scale = 3)
             cell.operator("object.click_asset",text="Download").asset_name = asset["name"]
-            label_len = asset["name"].len()//2
-            cell.label(text=asset["name"][:label_len])
-            cell.label(text=asset["name"][label_len:])
+            label_len = len(asset["name"])//2
+            prefs = bpy.context.preferences.addons["imeshh_online"].preferences 
+            if prefs.show_asset_name:
+                cell.label(text=asset["name"][:label_len])
+                cell.label(text=asset["name"][label_len:])
             
     def build_ui(self, layout:bpy.types.UILayout, context):
         row = layout.row(align=True)

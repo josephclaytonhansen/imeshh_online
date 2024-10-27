@@ -64,6 +64,7 @@ class AuthPreferences(AddonPreferences):
     username: StringProperty(name="Username", default="")
     password: StringProperty(name="Password", subtype='PASSWORD', default="")
     access_token: StringProperty(name="Access Token", default="", options={'HIDDEN'})
+    show_asset_name: BoolProperty(name="Show Asset Names in Browser", default=True)
 
     default_folder: StringProperty(
         name="Default Folder",
@@ -83,6 +84,7 @@ class AuthPreferences(AddonPreferences):
         layout.prop(self, "username")
         layout.prop(self, "password")
         layout.prop(self, "default_folder")
+        layout.prop(self, "show_asset_name")
         layout.operator("imeshh_online.authenticate", text="Authenticate", icon='KEY_HLT')
 
 
