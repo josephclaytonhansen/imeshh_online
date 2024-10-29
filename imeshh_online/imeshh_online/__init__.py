@@ -121,7 +121,7 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
                 subscriptions_endpoint,
                 auth=(wc_consumer_key, wc_consumer_secret),
                 headers=headers,
-                params={"customer": user_id}  # Use the integer user ID
+                params={"customer": prefs.user_id}  # Use the integer user ID
             )
             
             if subscription_response.status_code == 200:
