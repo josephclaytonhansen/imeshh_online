@@ -95,46 +95,70 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
             "Content-Type": "application/json"
         }
 
-        page = 1
-        user_found = False
+        # Step 2: Get User ID by Email
         try:
-            while not user_found:
-                # Request the current page of users
-                all_users_response = requests.get(
-                    f"{wp_site_url}/wp-json/wc/v3/customers",
-                    auth=(wc_consumer_key, wc_consumer_secret),
-                    headers={'Authorization': f'Bearer {prefs.access_token}'},
-                    params={'per_page': 100, 'page': page}
-                )
-                
-                if all_users_response.status_code == 200:
-                    all_users = all_users_response.json()
-                    # Exit loop if no more users
-                    if not all_users:
-                        break
-
-                    # Check each user for matching email
-                    for user in all_users:
-                        if user.get('email') == prefs.username:
-                            user_found = True
-                            prefs.subscription_id = user['id']
-                            print(f"User ID found: {user['id']}")
-                            break
-                    
-                    # Increment to the next page
-                    page += 1
-                    print(f"Checking page {page}...")
+            user_response = requests.get(
+                f"{wp_site_url}/wp-json/wc/v3/customers",
+                auth=(wc_consumer_key, wc_consumer_secret),
+                headers=headers,
+                params={"search": prefs.username}  # Change this line to search by email
+            )
+            
+            print(f"User search URL: {user_response.url}")
+            print(f"User search email: {prefs.username}")
+            print(f"User search response: {user_response.text}")
+            print(f"User search status code: {user_response.status_code}")
+            
+            if user_response.status_code == 200:
+                users = user_response.json()
+                if users:
+                    user_id = users[0]['id']  # Assume the first match is the correct user
+                    print(f"User ID found: {user_id}")
                 else:
-                    print(f"Failed to retrieve users on page {page}. Status Code: {all_users_response.status_code}")
-                    print(f"Response: {all_users_response.text}")
-                    return {'CANCELLED'}
-                
+                    page = 1
+                    user_found = False
+                    try:
+                        while not user_found:
+                            # Request the current page of users
+                            all_users_response = requests.get(
+                                f"{wp_site_url}/wp-json/wc/v3/customers",
+                                auth=(wc_consumer_key, wc_consumer_secret),
+                                headers={'Authorization': f'Bearer {prefs.access_token}'},
+                                params={'per_page': 100, 'page': page}
+                            )
+                            
+                            if all_users_response.status_code == 200:
+                                all_users = all_users_response.json()
+                                # Exit loop if no more users
+                                if not all_users:
+                                    break
+
+                                # Check each user for matching email
+                                for user in all_users:
+                                    if user.get('email') == prefs.username:
+                                        user_found = True
+                                        prefs.subscription_id = user['id']
+                                        print(f"User ID found: {user['id']}")
+                                        break
+                                
+                                # Increment to the next page
+                                page += 1
+                                print(f"Checking page {page}...")
+                            else:
+                                print(f"Failed to retrieve users on page {page}. Status Code: {all_users_response.status_code}")
+                                print(f"Response: {all_users_response.text}")
+                                return {'CANCELLED'}
+                            
+                    except Exception as e:
+                        print(f"Error retrieving user information: {e}")
+                        return {'CANCELLED'}
+                    
+                    if not user_found:
+                        print("No user found with that email.")
+                        return {'CANCELLED'}
+        
         except Exception as e:
             print(f"Error retrieving user information: {e}")
-            return {'CANCELLED'}
-        
-        if not user_found:
-            print("No user found with that email.")
             return {'CANCELLED'}
 
         # Step 3: Check subscription
