@@ -135,6 +135,8 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
 
                                 # Check each user for matching email
                                 for user in all_users:
+                                    print(f"Checking user: {user.get('email')}")
+                                    print(f"User == prefs.username: {user.get('email') == prefs.username}")
                                     if user.get('email') == prefs.username:
                                         user_found = True
                                         prefs.subscription_id = user['id']
