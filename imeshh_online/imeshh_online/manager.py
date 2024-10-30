@@ -80,8 +80,11 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
                 print(f"Product ID for asset: {self.asset_name} is {product_id}")
                 if product_id is None:
                     print("Product ID is None; cannot retrieve downloads.")
+                else:
+                    print(f"Product ID for asset '{self.asset_name}': {product_id}")
                 
             product_url = f"{products_endpoint}/{product_id}"
+            
             params = {
                 'consumer_key': wc_consumer_key,
                 'consumer_secret': wc_consumer_secret
@@ -90,6 +93,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
 
             if response.status_code == 200:
                 product_data = response.json()
+                print(f"response: {response.json()}")
                 if 'downloads' in product_data:
                     download_urls = [file['file'] for file in product_data['downloads']]
                     download_links = download_urls
@@ -121,6 +125,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
                     'consumer_secret': wc_consumer_secret
                 }
                 response = requests.get(products_endpoint, params=params)
+                print(f"response: {response.json()}")
                 
                 if response.status_code != 200:
                     print(f"Failed to fetch product ID for asset: {self.asset_name}")
@@ -138,6 +143,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
                 # Step 2: Fetch Product Details with Download URLs using the Product ID
                 product_url = f"{products_endpoint}/{product_id}"
                 response = requests.get(product_url, params=params)
+                print(f"response: {response.json()}")
 
                 if response.status_code == 200:
                     product_data = response.json()
