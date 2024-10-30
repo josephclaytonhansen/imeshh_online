@@ -130,6 +130,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
             
             if response.status_code == 200:
                 product_details = response.json()
+                categories = product_details.get('categories', [])
                 
                 # Retrieve download URLs if available
                 if 'downloads' in product_details:
@@ -137,7 +138,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
                     print(f"Download URLs: {download_links}")
                     # Get the default folder from preferences
                     prefs = bpy.context.preferences.addons['imeshh_online'].preferences
-                    default_folder = prefs.default  # Assuming this is a valid directory path
+                    default_folder = prefs.default_folder
 
                     # Save the ZIP files to the appropriate category folder
                     for link in download_links:
