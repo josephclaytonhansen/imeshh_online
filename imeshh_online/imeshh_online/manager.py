@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 import threading
 import requests
 from . import secrets
+import urllib.parse
 
 import os
 from pathlib import Path
@@ -47,9 +48,6 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
 
     def execute(self, context):
         print(f"Clicked on asset: {self.asset_name}")
-        prefs = bpy.context.preferences.addons['imeshh_online'].preferences
-        
-        download_links = []
         
         try:
             # Load WooCommerce credentials from secrets
@@ -61,15 +59,22 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
             wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
             products_endpoint = f"{wp_site_url}/wp-json/wc/v3/products"
             
-            # Step 1: Search for the Product ID by name
+            # Prepare query parameters with URL encoding
             params = {
                 'search': self.asset_name,
                 'consumer_key': wc_consumer_key,
                 'consumer_secret': wc_consumer_secret
             }
-            response = requests.get(products_endpoint, params=params)
+            url = f"{products_endpoint}?{urllib.parse.urlencode(params)}"
+            print(f"Request URL: {url}")
             
-            # Check if the request was successful and if any products are returned
+            # Make the GET request
+            response = requests.get(url)
+            
+            # Log the full response for debugging
+            print(f"Status Code: {response.status_code}")
+            print(f"Response Text: {response.text}")
+            
             if response.status_code != 200 or not response.json():
                 print(f"Failed to fetch product or product not found for asset: {self.asset_name}")
                 return {'FINISHED'}
@@ -83,17 +88,16 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
                 print("Product ID is None; cannot retrieve downloads.")
                 return {'FINISHED'}
 
-            # Step 2: Fetch Product Details to get Download URLs
+            # Fetch Product Details to get Download URLs
             product_url = f"{products_endpoint}/{product_id}"
-            response = requests.get(product_url, params={
-                'consumer_key': wc_consumer_key,
-                'consumer_secret': wc_consumer_secret
-            })
+            response = requests.get(f"{product_url}?consumer_key={wc_consumer_key}&consumer_secret={wc_consumer_secret}")
             
-            # Check if the request was successful
+            # Log the full response for debugging
+            print(f"Status Code (details): {response.status_code}")
+            print(f"Response Text (details): {response.text}")
+            
             if response.status_code == 200:
                 product_details = response.json()
-                print(f"Product details response: {product_details}")
                 
                 # Retrieve download URLs if available
                 if 'downloads' in product_details:
@@ -110,7 +114,6 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
 
         return {'FINISHED'}
 
-        
 
 
 redraw_queue = Queue()
