@@ -53,6 +53,12 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
 
     def execute(self, context):
         print(f"Clicked on asset: {self.asset_name}")
+        prefs.context.preferences.addons[__name__].preferences
+        
+        if prefs.subscription_id == 0 or prefs.access_token == "" or not prefs.subscription_id:
+            print("Please authenticate and check subscription before downloading assets.")
+            self.report({'ERROR'}, "Please authenticate and check subscription before downloading assets.")
+            return {'FINISHED'}
         
         try:
             # Load WooCommerce credentials from secrets
