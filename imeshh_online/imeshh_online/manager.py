@@ -53,7 +53,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
 
     def execute(self, context):
         print(f"Clicked on asset: {self.asset_name}")
-        prefs.context.preferences.addons[__name__].preferences
+        prefs = context.preferences.addons["imeshh_online"].preferences
         
         if prefs.subscription_id == 0 or prefs.access_token == "" or not prefs.subscription_id:
             print("Please authenticate and check subscription before downloading assets.")
@@ -135,6 +135,30 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
                 if 'downloads' in product_details:
                     download_links = [file['file'] for file in product_details['downloads']]
                     print(f"Download URLs: {download_links}")
+                    # Get the default folder from preferences
+                    prefs = bpy.context.preferences.addons['imeshh_online'].preferences
+                    default_folder = prefs.default  # Assuming this is a valid directory path
+
+                    # Save the ZIP files to the appropriate category folder
+                    for link in download_links:
+                        category_names = [category['name'] for category in categories]
+                        for category_name in category_names:
+                            # Create category folder path
+                            category_folder = os.path.join(default_folder, category_name)
+                            os.makedirs(category_folder, exist_ok=True)
+
+                            # Download and save the ZIP file
+                            zip_file_name = os.path.basename(link)  # Extract file name from URL
+                            zip_file_path = os.path.join(category_folder, zip_file_name)
+
+                            # Download the file
+                            zip_response = requests.get(link)
+                            if zip_response.status_code == 200:
+                                with open(zip_file_path, 'wb') as zip_file:
+                                    zip_file.write(zip_response.content)
+                                print(f"Saved ZIP file: {zip_file_path}")
+                            else:
+                                print(f"Failed to download ZIP file from {link}. Status Code: {zip_response.status_code}")
                 else:
                     print("No downloads found for this product.")
             else:
