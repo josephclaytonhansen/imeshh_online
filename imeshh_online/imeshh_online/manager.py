@@ -9,6 +9,7 @@ from enum import Enum
 from urllib.parse import urlencode
 import threading
 import requests
+from . import secrets
 
 import os
 from pathlib import Path
@@ -38,6 +39,9 @@ def _make_item(enum_name, id_, name, descr, preview_id, uid, is_icon=False):
 
     return _item_map[enum_name][lookup]
 
+
+
+
 class OBJECT_OT_ClickAsset(bpy.types.Operator):
     bl_idname = "object.click_asset"
     bl_label = "Click Asset"
@@ -46,6 +50,54 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
 
     def execute(self, context):
         print(f"Clicked on asset: {self.asset_name}")
+        prefs = bpy.context.preferences.addons['imeshh_online'].preferences
+        try:
+            env_vars = secrets.get_secrets()
+            wc_consumer_key = env_vars.get("WC_CONSUMER_KEY")
+            wc_consumer_secret = env_vars.get("WC_CONSUMER_SECRET")
+
+            # WooCommerce API endpoint
+            wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
+            products_endpoint = f"{wp_site_url}/wp-json/wc/v3/products"
+            
+            params = {
+                'search': self.asset_name,
+                'consumer_key': wc_consumer_key,
+                'consumer_secret': wc_consumer_secret
+            }
+            response = requests.get(products_endpoint, params=params)
+            
+            # Check if the request was successful
+            if response.status_code != 200:
+                print(f"Failed to fetch product ID for asset: {self.asset_name}")
+                return {'FINISHED'}
+            else:
+                product_id = response.json()[0]['id']
+                print(f"Product ID for asset: {self.asset_name} is {product_id}")
+                if product_id is None:
+                    print("Product ID is None; cannot retrieve downloads.")
+                
+            product_url = f"{products_endpoint}/{product_id}"
+            params = {
+                'consumer_key': wc_consumer_key,
+                'consumer_secret': wc_consumer_secret
+            }
+            response = requests.get(product_url, params=params)
+
+            if response.status_code == 200:
+                product_data = response.json()
+                if 'downloads' in product_data:
+                    download_urls = [file['file'] for file in product_data['downloads']]
+                    return download_urls
+                else:
+                    print("No downloads found for this product.")
+            else:
+                print(f"Failed to retrieve product details. Status Code: {response.status_code}")
+                print(f"Response: {response.text}")
+                
+        except Exception as e:
+            print(f"Error fetching product downloads: {e}")
+            
 
         return {'FINISHED'}
 
