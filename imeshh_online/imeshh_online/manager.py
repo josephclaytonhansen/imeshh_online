@@ -40,6 +40,11 @@ def _make_item(enum_name, id_, name, descr, preview_id, uid, is_icon=False):
 
     return _item_map[enum_name][lookup]
 
+import requests
+import urllib.parse
+import bpy
+from bpy.props import StringProperty
+
 class OBJECT_OT_ClickAsset(bpy.types.Operator):
     bl_idname = "object.click_asset"
     bl_label = "Click Asset"
@@ -59,7 +64,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
             wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
             products_endpoint = f"{wp_site_url}/wp-json/wc/v3/products"
             
-            # Prepare query parameters with URL encoding
+            # Prepare query parameters with URL encoding for the exact match
             params = {
                 'search': self.asset_name,
                 'consumer_key': wc_consumer_key,
@@ -68,19 +73,40 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
             url = f"{products_endpoint}?{urllib.parse.urlencode(params)}"
             print(f"Request URL: {url}")
             
-            # Make the GET request
+            # Make the GET request for exact match
             response = requests.get(url)
             
             # Log the full response for debugging
             print(f"Status Code: {response.status_code}")
             print(f"Response Text: {response.text}")
             
-            if response.status_code != 200 or not response.json():
+            product_data = response.json()
+
+            if response.status_code != 200 or not product_data:
+                print(f"Exact search failed; trying partial search for asset: {self.asset_name}")
+                
+                # Fallback to partial search using the first three words
+                keywords = self.asset_name.split(" ")[:3]  # Get the first three words
+                partial_search = " ".join(keywords)  # Join them into a single search string
+                
+                params['search'] = partial_search
+                url = f"{products_endpoint}?{urllib.parse.urlencode(params)}"
+                print(f"Partial Search Request URL: {url}")
+
+                # Make the GET request for partial match
+                response = requests.get(url)
+                
+                # Log the full response for debugging
+                print(f"Status Code (partial): {response.status_code}")
+                print(f"Response Text (partial): {response.text}")
+                
+                product_data = response.json()
+
+            if response.status_code != 200 or not product_data:
                 print(f"Failed to fetch product or product not found for asset: {self.asset_name}")
                 return {'FINISHED'}
 
             # Extract product ID
-            product_data = response.json()
             product_id = product_data[0].get('id')
             print(f"Product ID for asset '{self.asset_name}': {product_id}")
             
@@ -113,6 +139,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
             print(f"Error fetching product downloads: {e}")
 
         return {'FINISHED'}
+
 
 
 
