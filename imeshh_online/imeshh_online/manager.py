@@ -151,6 +151,17 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
                             # Download and save the ZIP file
                             zip_file_name = os.path.basename(link)  # Extract file name from URL
                             zip_file_path = os.path.join(category_folder, zip_file_name)
+                            
+                            # skip the file with GLTF in the name
+                            if "GLTF" in zip_file_name:
+                                print(f"Skipping GLTF file: {zip_file_path}")
+                                continue
+                            
+                            # skip the download if the file already exists
+                            if os.path.exists(zip_file_path):
+                                print(f"File already exists: {zip_file_path}")
+                                prefs.downloaded_assets.append(self.asset_name)
+                                continue
 
                             # Download the file
                             zip_response = requests.get(link)
@@ -771,7 +782,13 @@ class IMeshh_Manager():
             cell = grid.column().box()
             icon_id = self.get_thumbnail(asset)
             cell.template_icon(icon_value=icon_id, scale = 3)
-            cell.operator("object.click_asset",text="Download").asset_name = asset["name"]
+            
+            # if the asset name is in prefs.downloaded_assets, don't add the Download button
+            if asset["name"] in bpy.context.preferences.addons["imeshh_online"].preferences.downloaded_assets:
+                cell.operator("object.click_asset",text="Download").asset_name = asset["name"]
+            else:
+                # add an Append asset instead but for now, pass
+                pass
             label_len = len(asset["name"])//2
             prefs = bpy.context.preferences.addons["imeshh_online"].preferences 
             if prefs.show_asset_name:
@@ -784,6 +801,9 @@ class IMeshh_Manager():
         row = layout.row(align=True)
         self.build_navigation(row)
         self.build_asset_grid(layout)
+        row = layout.row(align=True)
+        # #Create a button that takes the user to imeshh.com
+        row.operator("wm.url_open", text="Visit Imeshh.com").url = "https://www.imeshh.com/"
 
 print("creating _manager")
 _manager = IMeshh_Manager()

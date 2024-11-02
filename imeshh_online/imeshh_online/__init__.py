@@ -44,6 +44,11 @@ class AuthPreferences(AddonPreferences):
     access_token: StringProperty(name="Access Token", default="", options={'HIDDEN'})
     subscription_id: IntProperty(name="Subscription ID", default=0, options={'HIDDEN'})  # New hidden property
     show_asset_name: BoolProperty(name="Show Asset Names in Browser", default=True)
+    downloaded_assets: CollectionProperty(
+        name="Downloaded Assets",
+        options={'HIDDEN'},
+        default=[],
+    )
 
     default_folder: StringProperty(
         name="Default Folder",
