@@ -9,7 +9,6 @@ from enum import Enum
 from urllib.parse import urlencode
 import threading
 import requests
-from . import secrets
 import urllib.parse
 
 import os
@@ -22,7 +21,8 @@ from bpy.props import EnumProperty,StringProperty
 import ctypes
 # from requests import Response
 BASE_URL = "https://shop.imeshh.com"
-STORE = BASE_URL + '/wp-json/wc/store/v1'
+NEW_URL = " https://shopimeshhcom.bigscoots-staging.com/wp-json/imeshh/"
+STORE = BASE_URL + 'https://shop.imeshh.com/wp-json/wc/store/v1'
 
 _item_map = dict() # dynamic enum bug 
 def _make_item(enum_name, id_, name, descr, preview_id, uid, is_icon=False):
@@ -61,26 +61,22 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
             return {'FINISHED'}
         
         try:
-            # Load WooCommerce credentials from secrets
-            env_vars = secrets.get_secrets()
-            wc_consumer_key = env_vars.get("WC_CONSUMER_KEY")
-            wc_consumer_secret = env_vars.get("WC_CONSUMER_SECRET")
-
-            # WooCommerce API endpoint
             wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
             products_endpoint = f"{wp_site_url}/wp-json/wc/v3/products"
+            authorization_header = "Authorization: Bearer " + prefs.access_token
             
             # Prepare query parameters with URL encoding for the exact match
             params = {
                 'search': self.asset_name,
-                'consumer_key': wc_consumer_key,
-                'consumer_secret': wc_consumer_secret
+            }
+            headers = {
+                'Authorization': authorization_header
             }
             url = f"{products_endpoint}?{urllib.parse.urlencode(params)}"
             print(f"Request URL: {url}")
             
             # Make the GET request for exact match
-            response = requests.get(url)
+            response = requests.get(url, headers=headers)
             
             # Log the full response for debugging
             print(f"Status Code: {response.status_code}")
@@ -122,7 +118,7 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
 
             # Fetch Product Details to get Download URLs
             product_url = f"{products_endpoint}/{product_id}"
-            response = requests.get(f"{product_url}?consumer_key={wc_consumer_key}&consumer_secret={wc_consumer_secret}")
+            response = requests.get(f"{product_url}", headers=headers)
             
             # Log the full response for debugging
             print(f"Status Code (details): {response.status_code}")
