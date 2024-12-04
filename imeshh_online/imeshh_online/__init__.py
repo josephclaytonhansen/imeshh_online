@@ -10,7 +10,6 @@ bl_info = {
 from . import manager
 from . import operators
 from . import ui
-from . import secrets
 
 from bpy.props import StringProperty
 from bpy.types import Operator, AddonPreferences
@@ -31,10 +30,6 @@ from bpy.types import Panel
 wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
 token_endpoint = wp_site_url + "/wp-json/jwt-auth/v1/token"
 subscriptions_endpoint = wp_site_url + "/wp-json/wc/v1/subscriptions"
-
-env_vars = secrets.get_secrets()
-wc_consumer_key = env_vars.get("WC_CONSUMER_KEY")
-wc_consumer_secret = env_vars.get("WC_CONSUMER_SECRET")
 
 class AuthPreferences(AddonPreferences):
     bl_idname = "imeshh_online"
@@ -124,7 +119,6 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
         try:
             subscription_response = requests.get(
                 subscriptions_endpoint,
-                auth=(wc_consumer_key, wc_consumer_secret),
                 headers=headers,
                 params={"customer": prefs.user_id}  # Use the integer user ID
             )
