@@ -1,7 +1,7 @@
 bl_info = {
     "name": "imeshh_online",
     "author": "iMeshh Ltd",
-    "version": (0, 3, 3),
+    "version": (0, 4, 2),
     "blender": (3, 6, 0),
     "category": "Asset Manager",
     "location": "View3D > Tools > iMeshh Online",
