@@ -217,7 +217,11 @@ def download_all_thumbnails():
     total_products = res.headers['X-WP-Total']
 
     url = url + f"?per_page={total_products}&page=1"
-    res = requests.get(url)
+    prefs = bpy.context.preferences.addons['imeshh_online'].preferences
+    headers = {
+        "Authorization": f"Bearer {prefs.access_token}"
+    }
+    res = requests.get(url, headers=headers)
 
     futures = total_products
     for asset in res.json():
