@@ -157,6 +157,8 @@ def register():
     bpy.utils.register_class(AuthPreferences)
     bpy.utils.register_class(IMESHH_OT_AuthenticateAndCheckSubscription)
     
+    bpy.utils.register_class(DownloadedAsset)
+    
 
 
 def unregister():
@@ -166,6 +168,8 @@ def unregister():
     
     bpy.utils.unregister_class(AuthPreferences)
     bpy.utils.unregister_class(IMESHH_OT_AuthenticateAndCheckSubscription)
+    
+    bpy.utils.unregister_class(DownloadedAsset)
 
 if __name__ == "__main__":
     register()
