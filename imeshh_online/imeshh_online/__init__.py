@@ -150,26 +150,22 @@ class IMESHH_OT_AuthenticateAndCheckSubscription(Operator):
 
 
 def register():
+    bpy.utils.register_class(DownloadedAsset)  # Register the PropertyGroup first
+    bpy.utils.register_class(AssetPath)  # Register the PropertyGroup first
+    bpy.utils.register_class(AuthPreferences)
+    bpy.utils.register_class(IMESHH_OT_AuthenticateAndCheckSubscription)
     manager.register()
     operators.register()
     ui.register()
-    
-    bpy.utils.register_class(AuthPreferences)
-    bpy.utils.register_class(IMESHH_OT_AuthenticateAndCheckSubscription)
-    
-    bpy.utils.register_class(DownloadedAsset)
-    
-
 
 def unregister():
     ui.unregister()
     operators.unregister()
     manager.unregister()
-    
-    bpy.utils.unregister_class(AuthPreferences)
     bpy.utils.unregister_class(IMESHH_OT_AuthenticateAndCheckSubscription)
-    
-    bpy.utils.unregister_class(DownloadedAsset)
+    bpy.utils.unregister_class(AuthPreferences)
+    bpy.utils.unregister_class(AssetPath)  # Unregister the PropertyGroup
+    bpy.utils.unregister_class(DownloadedAsset)  # Unregister the PropertyGroup
 
 if __name__ == "__main__":
     register()

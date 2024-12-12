@@ -556,13 +556,17 @@ class IMeshh_Manager():
         return roots
     
     def t_api_get_categories(self,url:str,query_params:dict):
-        query_string = urlencode(query_params)
-        url=f"{url}?{query_string}"
-        res = requests.get(url)
-        res.raise_for_status()
-        data = res.json()
-        self.categories = self.build_category_tree(data)
-        # print("manager categories: ", self.categories)
+        try:
+            query_string = urlencode(query_params)
+            url=f"{url}?{query_string}"
+            res = requests.get(url)
+            res.raise_for_status()
+            data = res.json()
+            self.categories = self.build_category_tree(data)
+            # print("manager categories: ", self.categories)
+        except Exception as e:
+            print("Error fetching categories: ",e)
+            
         self.register_properties()
 
     def get_category_tree(self, use_thread=False):
@@ -582,23 +586,32 @@ class IMeshh_Manager():
             self.t_api_get_categories(url,query_params)
 
     def t_api_get_assets(self,url:str,query_params:dict, is_background:bool):
-        page = query_params["page"]
-        category = f"{self.current_assettype}>{self.current_cat1}>{self.current_cat2}"
-        key = f"{category}_{query_params['search']}_{query_params['per_page']}"
-        # print(url)
-        res = requests.get(url)
-        res.raise_for_status()
-        #handle the exceptions
-        # int(res.headers['X-WP-Total'])
-        self.qr_pages = int(res.headers['X-WP-TotalPages'])
-        self.qr_assets = res.json()
+        try:
+            page = query_params["page"]
+            category = f"{self.current_assettype}>{self.current_cat1}>{self.current_cat2}"
+            key = f"{category}_{query_params['search']}_{query_params['per_page']}"
+            # print(url)
+            res = requests.get(url)
+            res.raise_for_status()
+            #handle the exceptions
+            # int(res.headers['X-WP-Total'])
+            self.qr_pages = int(res.headers['X-WP-TotalPages'])
+            self.qr_assets = res.json()
 
-        for asset in self.qr_assets:
-            self.get_thumbnail(asset, load_thumb=False)
-        if not is_background:
-            self.current_total_pages = int(res.headers['X-WP-TotalPages'])
-            print("Total pages: ",self.current_total_pages)
-            self.current_page = page
+            for asset in self.qr_assets:
+                self.get_thumbnail(asset, load_thumb=False)
+            if not is_background:
+                self.current_total_pages = int(res.headers['X-WP-TotalPages'])
+                print("Total pages: ",self.current_total_pages)
+                self.current_page = page
+        
+        except Exception as e:
+            print("Error fetching assets: ",e)
+            if not is_background:
+                redraw_queue.put(("query_fetch_status",FetchStatus.FAILED))
+            if is_background:
+                redraw_queue.put(("bgq_status",FetchStatus.FAILED))
+            return
 
         with self.lock_cached_query:
             if key not in self.cached_query.keys():
