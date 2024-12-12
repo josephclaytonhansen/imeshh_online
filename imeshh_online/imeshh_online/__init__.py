@@ -31,6 +31,13 @@ wp_site_url = 'https://shopimeshhcom.bigscoots-staging.com'
 token_endpoint = wp_site_url + "/wp-json/jwt-auth/v1/token"
 subscriptions_endpoint = wp_site_url + "/wp-json/wc/v1/subscriptions"
 
+class DownloadedAsset(bpy.types.PropertyGroup):
+    name: bpy.props.StringProperty(name="Name")
+    path: bpy.props.StringProperty(name="Path")
+
+class AssetPath(bpy.types.PropertyGroup):
+    path: bpy.props.StringProperty(name="Path")
+
 class AuthPreferences(AddonPreferences):
     bl_idname = "imeshh_online"
 
@@ -42,8 +49,7 @@ class AuthPreferences(AddonPreferences):
     downloaded_assets: CollectionProperty(
         name="Downloaded Assets",
         options={'HIDDEN'},
-        default=[],
-        type=bpy.types.PropertyGroup
+        type=DownloadedAsset  # Use the custom PropertyGroup
     )
 
     default_folder: StringProperty(
@@ -56,7 +62,7 @@ class AuthPreferences(AddonPreferences):
     paths: CollectionProperty(
         name="Asset Paths",
         description="Paths for different asset types",
-        type=bpy.types.PropertyGroup
+        type=AssetPath  # Use the custom PropertyGroup
     )
 
     def draw(self, context):

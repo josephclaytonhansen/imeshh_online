@@ -156,7 +156,9 @@ class OBJECT_OT_ClickAsset(bpy.types.Operator):
                             # skip the download if the file already exists
                             if os.path.exists(zip_file_path):
                                 print(f"File already exists: {zip_file_path}")
-                                prefs.downloaded_assets.append(self.asset_name)
+                                new_asset = prefs.downloaded_assets.add()
+                                new_asset.name = self.asset_name
+                                new_asset.path = zip_file_path
                                 continue
 
                             # Download the file
@@ -773,27 +775,33 @@ class IMeshh_Manager():
             op_props = middle.operator("simple.move_to", text=str(i), depress= i==self.current_page)
             op_props.page = i
 
-    def build_asset_grid(self,layout):
-    # print("asset grid UI")
+    def build_asset_grid(self, layout):
+        print("asset grid UI")
         grid = layout.grid_flow(row_major=True, columns=5, even_columns=True, even_rows=True, align=False)
-        # print("current page: ", self.current_page)
+        print("current page: ", self.current_page)
         assets = self.get_display_assets(self.current_page)
+        prefs = bpy.context.preferences.addons["imeshh_online"].preferences
+    
         for asset in assets:
             cell = grid.column().box()
             icon_id = self.get_thumbnail(asset)
-            cell.template_icon(icon_value=icon_id, scale = 3)
+            cell.template_icon(icon_value=icon_id, scale=3)
             
+            asset_name = asset["name"]  # Define asset_name here
+    
             # if the asset name is in prefs.downloaded_assets, don't add the Download button
-            if asset["name"] in bpy.context.preferences.addons["imeshh_online"].preferences.downloaded_assets:
-                cell.operator("object.click_asset",text="Download").asset_name = asset["name"]
+            asset_exists = any(downloaded_asset.name == asset_name for downloaded_asset in prefs.downloaded_assets)
+    
+            if asset_exists:
+                cell.operator("object.click_asset", text="Download").asset_name = asset_name
             else:
                 # add an Append asset instead but for now, pass
                 pass
-            label_len = len(asset["name"])//2
-            prefs = bpy.context.preferences.addons["imeshh_online"].preferences 
+    
+            label_len = len(asset_name) // 2
             if prefs.show_asset_name:
-                cell.label(text=asset["name"][:label_len])
-                cell.label(text=asset["name"][label_len:])
+                cell.label(text=asset_name[:label_len])
+                cell.label(text=asset_name[label_len:])
             
     def build_ui(self, layout:bpy.types.UILayout, context):
         row = layout.row(align=True)
