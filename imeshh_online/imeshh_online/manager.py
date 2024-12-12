@@ -1,4 +1,3 @@
-
 from concurrent.futures import ThreadPoolExecutor
 import functools
 from pathlib import Path
@@ -554,36 +553,42 @@ class IMeshh_Manager():
         roots[36902]["children"]=roots[36902]["children"][0]["children"][:]
         # print(len(roots[36902]["children"]))
         return roots
-    
-    def t_api_get_categories(self,url:str,query_params:dict):
+
+    def t_api_get_categories(self, url: str, query_params: dict):
         try:
             query_string = urlencode(query_params)
-            url=f"{url}?{query_string}"
-            res = requests.get(url)
+            url = f"{url}?{query_string}"
+            
+            prefs = bpy.context.preferences.addons["imeshh_online"].preferences
+            headers = {
+                "Authorization": f"Bearer {prefs.access_token}"
+            }
+            
+            res = requests.get(url, headers=headers)
             res.raise_for_status()
             data = res.json()
             self.categories = self.build_category_tree(data)
             # print("manager categories: ", self.categories)
         except Exception as e:
-            print("Error fetching categories: ",e)
+            print("Error fetching categories: ", e)
             
         self.register_properties()
 
     def get_category_tree(self, use_thread=False):
-        url= STORE + "/products/categories"
-        query_params={}
+        url = STORE + "/products/categories"
+        query_params = {}
         if use_thread:
             print("====:::categories inside thread :::====")
-            args = (url,query_params)
+            args = (url, query_params)
             vThread = threading.Thread(
-                    target=self.t_api_get_categories,
-                    args=args
-                )
+                target=self.t_api_get_categories,
+                args=args
+            )
             vThread.daemon = 1
             vThread.start()
             self.threads.append(vThread)
         else:
-            self.t_api_get_categories(url,query_params)
+            self.t_api_get_categories(url, query_params)
 
     def t_api_get_assets(self,url:str,query_params:dict, is_background:bool):
         try:
