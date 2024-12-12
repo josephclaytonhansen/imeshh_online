@@ -43,6 +43,7 @@ class AuthPreferences(AddonPreferences):
         name="Downloaded Assets",
         options={'HIDDEN'},
         default=[],
+        type=bpy.types.PropertyGroup
     )
 
     default_folder: StringProperty(

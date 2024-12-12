@@ -22,7 +22,7 @@ import ctypes
 # from requests import Response
 BASE_URL = "https://shop.imeshh.com"
 NEW_URL = " https://shopimeshhcom.bigscoots-staging.com/wp-json/imeshh/"
-STORE = BASE_URL + 'https://shop.imeshh.com/wp-json/wc/store/v1'
+STORE = 'https://shop.imeshh.com/wp-json/wc/store/v1'
 
 _item_map = dict() # dynamic enum bug 
 def _make_item(enum_name, id_, name, descr, preview_id, uid, is_icon=False):
